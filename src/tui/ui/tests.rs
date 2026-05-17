@@ -293,7 +293,7 @@ fn header_shows_connected_account() {
 }
 
 #[test]
-fn header_styles_current_user_white_until_speaking() {
+fn header_keeps_current_user_white_while_speaking() {
     let mut state = DashboardState::new();
     state.push_event(AppEvent::Ready {
         user: "muri".to_owned(),
@@ -341,7 +341,7 @@ fn header_styles_current_user_white_until_speaking() {
         .map(|col| buffer[(col, 0)].symbol().to_owned())
         .collect::<String>();
     let user_col = header.find("muri").expect("header should include user") as u16;
-    assert_eq!(buffer[(user_col, 0)].fg, Color::Green);
+    assert_eq!(buffer[(user_col, 0)].fg, Color::White);
 }
 
 #[test]
@@ -1672,7 +1672,7 @@ fn channel_pane_shows_voice_participants_under_voice_channel() {
 }
 
 #[test]
-fn member_pane_highlights_only_speaking_voice_members() {
+fn member_pane_keeps_normal_style_for_speaking_voice_members() {
     let guild_id = Id::new(1);
     let voice_id = Id::new(10);
     let alice = Id::new(20);
@@ -1740,21 +1740,6 @@ fn member_pane_highlights_only_speaking_voice_members() {
         channel_id: voice_id,
         user_id: alice,
         speaking: true,
-    });
-    let backend = TestBackend::new(40, 6);
-    let mut terminal = Terminal::new(backend).expect("test terminal should build");
-    terminal
-        .draw(|frame| render_members(frame, frame.area(), &state, &[]))
-        .expect("draw should succeed");
-    let buffer = terminal.backend().buffer();
-    let alice_cell = find_cell(buffer, "Alice").expect("member should render");
-    assert_eq!(buffer[alice_cell].fg, Color::Green);
-
-    state.push_event(AppEvent::VoiceSpeakingUpdate {
-        guild_id,
-        channel_id: voice_id,
-        user_id: alice,
-        speaking: false,
     });
     let backend = TestBackend::new(40, 6);
     let mut terminal = Terminal::new(backend).expect("test terminal should build");

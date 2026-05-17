@@ -137,8 +137,7 @@ Tokens are saved under Concord's config directory in plain text. See the Securit
 - Receive voice playback when built with `--features voice-playback`
 - Transmit microphone audio when built with `--features voice-playback`, joined
   from this Concord session, explicitly allowed, and not self-muted
-- Highlight active voice speakers in channel rows, the member pane, and the
-  current-user header
+- Highlight active voice speakers in voice channel participant rows
 - Track unread messages and mention counts per channel
 - Mute and unmute channels and servers
 
@@ -410,11 +409,6 @@ and default to `100`, which preserves the normal audio level. Press `Space`,
 sensitivity and press `h`/`l` to adjust by 1 dB or `H`/`L` to adjust by 10 dB.
 The microphone and voice volume rows use the same keys to adjust by 1 or 10
 percent.
-
-Voice active speaker styling follows the actual voice path. The current user is
-highlighted only after Concord sends Speaking on. Remote users are highlighted
-from Discord speaking updates and received RTP activity, then clear after a
-short inactivity timeout.
 
 ## Performance
 

@@ -192,6 +192,19 @@ impl DiscordState {
 
     pub(super) fn update_voice_state(&mut self, state: &VoiceStateInfo) {
         let key = (state.guild_id, state.user_id);
+        let current_user_previous_channel = if self.session.current_user_id == Some(state.user_id) {
+            self.voice
+                .states
+                .get(&key)
+                .map(|current| current.channel_id)
+        } else {
+            None
+        };
+        if let Some(previous_channel_id) = current_user_previous_channel {
+            if state.channel_id != Some(previous_channel_id) {
+                self.clear_voice_speaking_for_channel(state.guild_id, previous_channel_id);
+            }
+        }
         if let Some(channel_id) = state.channel_id {
             let speaking = self
                 .voice
@@ -249,6 +262,18 @@ impl DiscordState {
         self.voice
             .states
             .retain(|_, state| state.channel_id != channel_id);
+    }
+
+    fn clear_voice_speaking_for_channel(
+        &mut self,
+        guild_id: Id<GuildMarker>,
+        channel_id: Id<ChannelMarker>,
+    ) {
+        for ((state_guild_id, _), state) in &mut self.voice.states {
+            if *state_guild_id == guild_id && state.channel_id == channel_id {
+                state.speaking = false;
+            }
+        }
     }
 }
 

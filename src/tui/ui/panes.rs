@@ -1260,11 +1260,8 @@ pub(super) fn render_members(
             let member = *member;
             let is_selected = focused && selected_line == Some(line_index);
             let marker_style = Style::default().fg(presence_color(member.status()));
-            let name_style = if state.user_voice_speaking(member.user_id()) {
-                Style::default().fg(Color::Green).bold()
-            } else {
-                member_name_style(member, state.member_role_color(member), is_selected)
-            };
+            let name_style =
+                member_name_style(member, state.member_role_color(member), is_selected);
 
             let display_name = state.member_display_name(member);
             let display = member_display_label(
@@ -1483,12 +1480,10 @@ pub(super) fn render_header(frame: &mut Frame, area: Rect, state: &DashboardStat
     let mut spans = vec![Span::styled(title, Style::default().fg(Color::Cyan).bold())];
     if let Some(user) = state.current_user() {
         spans.push(Span::styled(" Connected as ", Style::default().fg(DIM)));
-        let user_style = if state.current_user_voice_speaking() {
-            Style::default().fg(Color::Green).bold()
-        } else {
-            Style::default().fg(Color::White).bold()
-        };
-        spans.push(Span::styled(format!("{user} "), user_style));
+        spans.push(Span::styled(
+            format!("{user} "),
+            Style::default().fg(Color::White).bold(),
+        ));
     } else {
         spans.push(Span::styled(
             " Loading... ",

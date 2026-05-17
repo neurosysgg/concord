@@ -67,6 +67,7 @@ fn tracks_voice_participants_join_move_and_leave() {
     let first_voice = Id::new(10);
     let second_voice = Id::new(11);
     let alice = Id::new(20);
+    let bob = Id::new(21);
     let mut state = DiscordState::default();
 
     state.apply_event(&AppEvent::Ready {
@@ -77,7 +78,7 @@ fn tracks_voice_participants_join_move_and_leave() {
     state.apply_event(&AppEvent::GuildCreate {
         guild_id,
         name: "guild".to_owned(),
-        member_count: Some(1),
+        member_count: Some(2),
         channels: vec![
             ChannelInfo {
                 kind: "GuildVoice".to_owned(),
@@ -170,6 +171,42 @@ fn tracks_voice_participants_join_move_and_leave() {
     assert!(state.user_voice_speaking_in_guild(guild_id, alice));
     assert!(!state.user_voice_speaking_in_guild(Id::new(999), alice));
 
+    let bob_member = MemberInfo {
+        user_id: bob,
+        display_name: "Bob".to_owned(),
+        username: Some("bob".to_owned()),
+        is_bot: false,
+        avatar_url: None,
+        role_ids: Vec::new(),
+    };
+    state.apply_event(&AppEvent::VoiceStateUpdate {
+        state: VoiceStateInfo {
+            guild_id,
+            channel_id: Some(first_voice),
+            user_id: bob,
+            session_id: None,
+            member: Some(bob_member),
+            deaf: false,
+            mute: false,
+            self_deaf: false,
+            self_mute: false,
+            self_stream: false,
+        },
+    });
+    state.apply_event(&AppEvent::VoiceSpeakingUpdate {
+        guild_id,
+        channel_id: first_voice,
+        user_id: bob,
+        speaking: true,
+    });
+    let first_voice_participants = state.voice_participants_for_channel(guild_id, first_voice);
+    assert_eq!(first_voice_participants.len(), 2);
+    assert!(
+        first_voice_participants
+            .iter()
+            .any(|participant| participant.user_id == bob && participant.speaking)
+    );
+
     state.apply_event(&AppEvent::VoiceStateUpdate {
         state: VoiceStateInfo {
             guild_id,
@@ -184,11 +221,10 @@ fn tracks_voice_participants_join_move_and_leave() {
             self_stream: false,
         },
     });
-    assert!(
-        state
-            .voice_participants_for_channel(guild_id, first_voice)
-            .is_empty()
-    );
+    let first_voice_participants = state.voice_participants_for_channel(guild_id, first_voice);
+    assert_eq!(first_voice_participants.len(), 1);
+    assert_eq!(first_voice_participants[0].user_id, bob);
+    assert!(!first_voice_participants[0].speaking);
     assert_eq!(
         state.voice_participants_for_channel(guild_id, second_voice)[0].user_id,
         alice
@@ -212,6 +248,33 @@ fn tracks_voice_participants_join_move_and_leave() {
     state.apply_event(&AppEvent::VoiceStateUpdate {
         state: VoiceStateInfo {
             guild_id,
+            channel_id: Some(second_voice),
+            user_id: bob,
+            session_id: None,
+            member: None,
+            deaf: false,
+            mute: false,
+            self_deaf: false,
+            self_mute: false,
+            self_stream: false,
+        },
+    });
+    state.apply_event(&AppEvent::VoiceSpeakingUpdate {
+        guild_id,
+        channel_id: second_voice,
+        user_id: bob,
+        speaking: true,
+    });
+    assert!(
+        state
+            .voice_participants_for_channel(guild_id, second_voice)
+            .iter()
+            .any(|participant| participant.user_id == bob && participant.speaking)
+    );
+
+    state.apply_event(&AppEvent::VoiceStateUpdate {
+        state: VoiceStateInfo {
+            guild_id,
             channel_id: None,
             user_id: alice,
             session_id: None,
@@ -223,11 +286,10 @@ fn tracks_voice_participants_join_move_and_leave() {
             self_stream: false,
         },
     });
-    assert!(
-        state
-            .voice_participants_for_channel(guild_id, second_voice)
-            .is_empty()
-    );
+    let second_voice_participants = state.voice_participants_for_channel(guild_id, second_voice);
+    assert_eq!(second_voice_participants.len(), 1);
+    assert_eq!(second_voice_participants[0].user_id, bob);
+    assert!(!second_voice_participants[0].speaking);
     assert_eq!(state.current_user_voice_connection(), None);
 }
 
