@@ -6,6 +6,26 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- Secure URL opening from messages by @chojs23
+- Fix composer draft clearing on mouse focus change (#100) in [#100](https://github.com/chojs23/concord/pull/100) by @chojs23
+
+### Features
+
+- Add support for detecting links in messages and opening them in the default browser (#86) in [#86](https://github.com/chojs23/concord/pull/86) by @nexxai
+- Focus next pane after selection (#102) in [#102](https://github.com/chojs23/concord/pull/102) by @chojs23
+- Add query-based guild member search for mention autocomplete (#103) in [#103](https://github.com/chojs23/concord/pull/103) by @chojs23
+- Improve channel switcher ranking and recents by @chojs23
+
+### Performance
+
+- Reduce Discord snapshot churn by @chojs23
+- Reduce TUI redraw allocations by @chojs23
+- Cache channel switcher items while open by @chojs23
+
+## [2.0.1] - 2026-05-18
+
+### Bug Fixes
+
 - _(voice)_ Reduce microphone tearing during transmit (#96) in [#96](https://github.com/chojs23/concord/pull/96) by @chojs23
 
 ### Features
