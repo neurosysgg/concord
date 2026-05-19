@@ -22,7 +22,9 @@ use crate::{
         VoiceConnectionStatus, validate_token_header,
     },
     error::AppError,
-    logging, token_store, tui, version_check,
+    logging, token_store, tui,
+    url_policy::normalize_openable_url,
+    version_check,
 };
 
 const MESSAGE_HISTORY_LIMIT: u16 = 50;
@@ -516,10 +518,10 @@ fn start_command_loop(
                     },
                     AppCommand::OpenUrl { url } => {
                         if let Err(error) = open_url(&url) {
-                            logging::error("app", format!("open attachment failed: {error}"));
+                            logging::error("app", format!("open url failed: {error}"));
                             client
                                 .publish_event(AppEvent::GatewayError {
-                                    message: format!("open attachment failed: {error}"),
+                                    message: format!("open url failed: {error}"),
                                 })
                                 .await;
                         }
@@ -1112,7 +1114,9 @@ fn write_unique_download_file(
 }
 
 fn open_url(url: &str) -> io::Result<()> {
-    let status = open_url_command(url).status()?;
+    let url = normalize_openable_url(url)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "unsupported URL scheme"))?;
+    let status = open_url_command(&url).status()?;
     if status.success() {
         Ok(())
     } else {
@@ -1123,25 +1127,45 @@ fn open_url(url: &str) -> io::Result<()> {
 }
 
 fn open_url_command(url: &str) -> Command {
+    let spec = current_open_url_command_spec(url);
+    let mut command = Command::new(spec.program);
+    command.args(spec.args);
+    command
+}
+
+struct UrlOpenCommandSpec {
+    program: &'static str,
+    args: Vec<String>,
+}
+
+fn current_open_url_command_spec(url: &str) -> UrlOpenCommandSpec {
     #[cfg(target_os = "macos")]
     {
-        let mut command = Command::new("open");
-        command.arg(url);
-        command
+        UrlOpenCommandSpec {
+            program: "open",
+            args: vec![url.to_owned()],
+        }
     }
 
     #[cfg(target_os = "windows")]
     {
-        let mut command = Command::new("cmd");
-        command.args(["/C", "start", "", url]);
-        command
+        windows_open_url_command_spec(url)
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        let mut command = Command::new("xdg-open");
-        command.arg(url);
-        command
+        UrlOpenCommandSpec {
+            program: "xdg-open",
+            args: vec![url.to_owned()],
+        }
+    }
+}
+
+#[cfg(any(test, target_os = "windows"))]
+fn windows_open_url_command_spec(url: &str) -> UrlOpenCommandSpec {
+    UrlOpenCommandSpec {
+        program: "rundll32",
+        args: vec!["url.dll,FileProtocolHandler".to_owned(), url.to_owned()],
     }
 }
 
@@ -1233,7 +1257,10 @@ async fn shutdown_gateway(client: &DiscordClient, mut gateway_task: tokio::task:
 mod tests {
     use std::{fs, process};
 
-    use super::{login_notice_for_token_warnings, sanitize_filename, write_unique_download_file};
+    use super::{
+        login_notice_for_token_warnings, open_url, sanitize_filename,
+        windows_open_url_command_spec, write_unique_download_file,
+    };
 
     fn unix_timestamp_nanos() -> u128 {
         std::time::SystemTime::now()
@@ -1294,5 +1321,26 @@ mod tests {
     #[test]
     fn sanitize_filename_replaces_path_separators() {
         assert_eq!(sanitize_filename("../cat\\dog.png"), "_cat_dog.png");
+    }
+
+    #[test]
+    fn open_url_rejects_non_web_schemes_before_spawning_opener() {
+        let error = open_url("file:///etc/passwd").expect_err("file URLs should be rejected");
+
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn windows_url_opener_avoids_cmd_shell_parsing() {
+        let spec = windows_open_url_command_spec("https://example.com/?a=1&b=2");
+
+        assert_eq!(spec.program, "rundll32");
+        assert_eq!(
+            spec.args,
+            vec![
+                "url.dll,FileProtocolHandler".to_owned(),
+                "https://example.com/?a=1&b=2".to_owned(),
+            ]
+        );
     }
 }

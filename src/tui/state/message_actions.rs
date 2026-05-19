@@ -1,4 +1,4 @@
-use crate::discord::{AppCommand, EmbedInfo, MessageState, ReactionEmoji};
+use crate::discord::{AppCommand, MessageState, ReactionEmoji};
 use crate::tui::format::detected_urls;
 
 use super::scroll::{clamp_selected_index, move_index_down, move_index_up};
@@ -653,42 +653,7 @@ fn message_urls(message: &MessageState) -> Vec<String> {
     if let Some(content) = &message.content {
         urls.extend(detected_urls(content));
     }
-    for embed in &message.embeds {
-        urls.extend(embed_urls(embed));
-    }
     dedupe_urls(urls)
-}
-
-fn embed_urls(embed: &EmbedInfo) -> Vec<String> {
-    let mut urls = Vec::new();
-    for value in [
-        embed.provider_name.as_deref(),
-        embed.author_name.as_deref(),
-        embed.title.as_deref(),
-        embed.description.as_deref(),
-        embed.footer_text.as_deref(),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        urls.extend(detected_urls(value));
-    }
-    for field in &embed.fields {
-        urls.extend(detected_urls(&field.name));
-        urls.extend(detected_urls(&field.value));
-    }
-    urls.extend(
-        [
-            embed.url.as_deref(),
-            embed.thumbnail_url.as_deref(),
-            embed.image_url.as_deref(),
-            embed.video_url.as_deref(),
-        ]
-        .into_iter()
-        .flatten()
-        .map(str::to_owned),
-    );
-    urls
 }
 
 fn dedupe_urls(urls: Vec<String>) -> Vec<String> {

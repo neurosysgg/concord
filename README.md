@@ -149,7 +149,7 @@ Tokens are saved under Concord's config directory in plain text. See the Securit
 - Use @mention autocomplete while composing messages
 - View full message history with pagination
 - Rich content display (embeds, attachments, stickers, and mentions)
-- Detect URLs in message bodies, markdown links, and embed content, then open them in your default browser
+- Detect URLs in message bodies and markdown links, then open them in your default browser
 - Direct message shortcuts for copy, reply, edit, delete, pin/unpin, reactions,
   image viewing, and profile lookup
 

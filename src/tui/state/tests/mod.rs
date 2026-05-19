@@ -3166,7 +3166,7 @@ fn message_action_detects_markdown_link_urls() {
 }
 
 #[test]
-fn message_action_detects_embed_urls() {
+fn message_action_ignores_embed_urls() {
     let mut state = state_with_messages(1);
     state.push_event(AppEvent::MessageHistoryLoaded {
         channel_id: Id::new(2),
@@ -3186,15 +3186,15 @@ fn message_action_detects_embed_urls() {
                 }],
                 footer_text: None,
                 url: Some("https://app.example/releases/1".to_owned()),
-                thumbnail_url: None,
+                thumbnail_url: Some("https://media.example/thumb.jpg".to_owned()),
                 thumbnail_proxy_url: None,
                 thumbnail_width: None,
                 thumbnail_height: None,
-                image_url: None,
+                image_url: Some("https://media.example/image.jpg".to_owned()),
                 image_proxy_url: None,
                 image_width: None,
                 image_height: None,
-                video_url: None,
+                video_url: Some("https://media.example/video.mp4".to_owned()),
             }],
             ..message_info(Id::new(2), 1)
         }],
@@ -3204,14 +3204,7 @@ fn message_action_detects_embed_urls() {
 
     let urls = state.selected_message_url_items();
 
-    assert_eq!(
-        urls.into_iter().map(|item| item.url).collect::<Vec<_>>(),
-        vec![
-            "https://docs.example/release",
-            "https://status.example",
-            "https://app.example/releases/1",
-        ]
-    );
+    assert_eq!(urls, Vec::new());
 }
 
 #[test]
