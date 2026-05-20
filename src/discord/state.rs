@@ -765,6 +765,17 @@ impl DiscordState {
                 forwarded_snapshots,
                 ..
             } => {
+                let remove_typing_channel =
+                    if let Some(bucket) = self.presence.typing.get_mut(channel_id) {
+                        bucket.remove(author_id);
+                        bucket.is_empty()
+                    } else {
+                        false
+                    };
+                if remove_typing_channel {
+                    self.presence.typing.remove(channel_id);
+                }
+
                 let guild_id = guild_id.or_else(|| self.channel_guild_id(*channel_id));
                 let is_current_user_message = self.session.current_user_id == Some(*author_id);
                 self.record_author_role_ids(*channel_id, *message_id, author_role_ids);

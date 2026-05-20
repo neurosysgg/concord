@@ -4949,9 +4949,11 @@ fn cancel_emoji_picker_keeps_typed_text() {
 #[test]
 fn typing_footer_resolves_one_user_to_alias() {
     let mut state = state_with_writable_channel_and_members();
+    let channel_id = Id::new(2);
+    let user_id = Id::new(20);
     state.push_event(AppEvent::TypingStart {
-        channel_id: Id::new(2),
-        user_id: Id::new(20),
+        channel_id,
+        user_id,
         display_name: Some("Live Nick".to_owned()),
     });
 
@@ -4959,6 +4961,28 @@ fn typing_footer_resolves_one_user_to_alias() {
         state.typing_footer_for_selected_channel(),
         Some("Live Nick is typing\u{2026}".to_owned())
     );
+
+    state.push_event(AppEvent::MessageCreate {
+        guild_id: Some(Id::new(1)),
+        channel_id,
+        message_id: Id::new(100),
+        author_id: user_id,
+        author: "Live Nick".to_owned(),
+        author_avatar_url: None,
+        author_role_ids: Vec::new(),
+        message_kind: MessageKind::regular(),
+        reference: None,
+        reply: None,
+        poll: None,
+        content: Some("sent".to_owned()),
+        sticker_names: Vec::new(),
+        mentions: Vec::new(),
+        attachments: Vec::new(),
+        embeds: Vec::new(),
+        forwarded_snapshots: Vec::new(),
+    });
+
+    assert_eq!(state.typing_footer_for_selected_channel(), None);
 }
 
 #[test]
