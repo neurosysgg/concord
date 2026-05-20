@@ -12,6 +12,7 @@ By submitting this PR you agree it will be distributed under GPL-3.0-only.
 ## Why
 
 <!-- The motivation. Link the issue it closes, e.g. "Closes #123". -->
+<!-- Feature additions must have a related issue first. Feature PRs without a related issue may be closed without review. -->
 
 ## How
 
@@ -33,6 +34,7 @@ By submitting this PR you agree it will be distributed under GPL-3.0-only.
 ## Checklist
 
 - [ ] One logical change per PR.
+- [ ] Link a related issue.
 - [ ] No tokens, passwords, MFA codes, or raw auth bodies in code, tests, or logs.
 - [ ] Change does not add self-bot automation, mass actions, or scraping.
 - [ ] Updated `README.md`, if behavior or workflows changed.
