@@ -3,7 +3,7 @@ use crate::discord::ids::{
     marker::{AttachmentMarker, ChannelMarker, GuildMarker, MessageMarker, RoleMarker, UserMarker},
 };
 
-use super::commands::ReactionEmoji;
+use crate::discord::commands::ReactionEmoji;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MentionInfo {

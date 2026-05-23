@@ -7,7 +7,9 @@ use crate::discord::ids::{
 };
 use crate::discord::{ActivityInfo, MemberInfo, PresenceStatus, RoleInfo};
 
-use super::{DiscordState, MAX_RECENT_MEMBER_GUILDS, TYPING_INDICATOR_TTL, is_fallback_identity};
+use crate::discord::state::{
+    DiscordState, MAX_RECENT_MEMBER_GUILDS, TYPING_INDICATOR_TTL, is_fallback_identity,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypingUserState {
@@ -155,7 +157,7 @@ impl DiscordState {
             .unwrap_or(false)
     }
 
-    pub(super) fn update_user_activities(
+    pub(in crate::discord) fn update_user_activities(
         &mut self,
         user_id: Id<UserMarker>,
         activities: &[ActivityInfo],
@@ -169,7 +171,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn update_guild_user_activities(
+    pub(in crate::discord) fn update_guild_user_activities(
         &mut self,
         guild_id: Id<GuildMarker>,
         user_id: Id<UserMarker>,
@@ -185,7 +187,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn upsert_guild_member(
+    pub(in crate::discord) fn upsert_guild_member(
         &mut self,
         guild_id: Id<GuildMarker>,
         member: &MemberInfo,
@@ -234,7 +236,7 @@ impl DiscordState {
         was_known
     }
 
-    pub(super) fn refresh_current_user_role_cache(&mut self) {
+    pub(in crate::discord) fn refresh_current_user_role_cache(&mut self) {
         let Some(current_user_id) = self.session.current_user_id else {
             return;
         };
@@ -247,7 +249,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn current_user_role_ids_for_guild(
+    pub(in crate::discord) fn current_user_role_ids_for_guild(
         &self,
         guild_id: Id<GuildMarker>,
     ) -> Option<&[Id<RoleMarker>]> {
@@ -265,7 +267,10 @@ impl DiscordState {
             })
     }
 
-    pub(super) fn record_selected_member_guild(&mut self, guild_id: Option<Id<GuildMarker>>) {
+    pub(in crate::discord) fn record_selected_member_guild(
+        &mut self,
+        guild_id: Option<Id<GuildMarker>>,
+    ) {
         if let Some(guild_id) = guild_id {
             self.guild_details
                 .member_cache_guild_order
@@ -392,7 +397,7 @@ fn collect_nested_message_authors(
     }
 }
 
-pub(super) fn upsert_member(
+pub(in crate::discord) fn upsert_member(
     map: &mut BTreeMap<Id<UserMarker>, GuildMemberState>,
     member: &MemberInfo,
     previous_status: Option<PresenceStatus>,
@@ -431,7 +436,7 @@ pub(super) fn upsert_member(
     );
 }
 
-pub(super) fn role_map(roles: &[RoleInfo]) -> BTreeMap<Id<RoleMarker>, RoleState> {
+pub(in crate::discord) fn role_map(roles: &[RoleInfo]) -> BTreeMap<Id<RoleMarker>, RoleState> {
     roles
         .iter()
         .map(|role| {
@@ -450,14 +455,14 @@ pub(super) fn role_map(roles: &[RoleInfo]) -> BTreeMap<Id<RoleMarker>, RoleState
         .collect()
 }
 
-pub(super) fn selected_member_role_color(
+pub(in crate::discord) fn selected_member_role_color(
     member: &GuildMemberState,
     roles: &BTreeMap<Id<RoleMarker>, RoleState>,
 ) -> Option<u32> {
     selected_role_ids_color(&member.role_ids, roles)
 }
 
-pub(super) fn selected_role_ids_color(
+pub(in crate::discord) fn selected_role_ids_color(
     role_ids: &[Id<RoleMarker>],
     roles: &BTreeMap<Id<RoleMarker>, RoleState>,
 ) -> Option<u32> {

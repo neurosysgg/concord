@@ -4,7 +4,7 @@ use crate::discord::ids::{
     Id,
     marker::{ChannelMarker, GuildMarker, MessageMarker},
 };
-use crate::discord::{GuildFolder, GuildState};
+use crate::discord::{GuildFolder, GuildState, MuteDuration};
 
 use super::{ActiveGuildScope, DashboardState, FolderKey};
 use super::{
@@ -556,5 +556,26 @@ impl DashboardState {
         } else {
             None
         }
+    }
+}
+
+impl DashboardState {
+    pub fn toggle_selected_guild_mute(
+        &mut self,
+        duration: Option<MuteDuration>,
+    ) -> Option<AppCommand> {
+        let guild_id = self.selected_guild_cursor_id()?;
+        let label = self
+            .discord
+            .guild(guild_id)
+            .map(|guild| guild.name.clone())
+            .unwrap_or_else(|| format!("server-{}", guild_id.get()));
+        let muted = !self.discord.cache.guild_notification_muted(guild_id);
+        Some(AppCommand::SetGuildMuted {
+            guild_id,
+            muted,
+            duration,
+            label,
+        })
     }
 }

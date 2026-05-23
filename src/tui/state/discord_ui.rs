@@ -1,0 +1,241 @@
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+};
+
+use crate::discord::ids::{
+    Id,
+    marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
+};
+use crate::discord::{
+    AppEvent, ApplicationCommandInfo, ChannelUnreadState, DiscordSnapshot, DiscordState,
+    SnapshotAreas, SnapshotRevision,
+};
+
+use super::{DashboardState, DesktopNotification, message_notification_body};
+
+#[derive(Debug, Default)]
+pub(super) struct DiscordUiState {
+    pub(super) cache: DiscordState,
+    pub(super) current_user: Option<String>,
+    pub(super) current_user_id: Option<Id<UserMarker>>,
+    pub(super) application_commands: HashMap<Option<Id<GuildMarker>>, Vec<ApplicationCommandInfo>>,
+    pub(super) current_user_can_use_animated_custom_emojis: Option<bool>,
+    pub(super) update_available_version: Option<String>,
+}
+
+impl Deref for DiscordUiState {
+    type Target = DiscordState;
+
+    fn deref(&self) -> &Self::Target {
+        &self.cache
+    }
+}
+
+impl DerefMut for DiscordUiState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.cache
+    }
+}
+
+impl DashboardState {
+    pub fn restore_discord_snapshot(&mut self, discord: DiscordState) {
+        self.restore_discord_snapshot_with(SnapshotAreas::all(), |state| {
+            *state = discord;
+        });
+    }
+
+    pub fn restore_discord_snapshot_areas(
+        &mut self,
+        snapshot: &DiscordSnapshot,
+        previous_revision: SnapshotRevision,
+    ) {
+        let areas = snapshot.revision.changed_areas_since(previous_revision);
+        self.restore_discord_snapshot_with(areas, |state| {
+            state.restore_snapshot_areas(snapshot, previous_revision);
+        });
+    }
+
+    fn restore_discord_snapshot_with(
+        &mut self,
+        areas: SnapshotAreas,
+        restore: impl FnOnce(&mut DiscordState),
+    ) {
+        let was_auto_follow = self.messages.message_auto_follow;
+        let was_at_latest = was_auto_follow || self.is_viewport_at_latest_message();
+        let was_cursor_on_last = self.cursor_on_last_message();
+        let was_following_cursor = was_at_latest && was_cursor_on_last;
+        let preserve_selection = !was_following_cursor;
+        let preserve_scroll = !(was_at_latest || was_following_cursor);
+        let selected_message_id = preserve_selection
+            .then(|| {
+                self.messages()
+                    .get(self.selected_message())
+                    .map(|message| message.id)
+            })
+            .flatten();
+        let scroll_message_id = preserve_scroll
+            .then(|| {
+                self.messages()
+                    .get(self.messages.message_scroll)
+                    .map(|message| message.id)
+            })
+            .flatten();
+        let channel_cursor_id = self.selected_channel_cursor_id();
+
+        restore(&mut self.discord.cache);
+        self.clear_message_row_content_metrics_cache();
+        if areas.navigation {
+            self.repair_navigation_after_discord_restore(channel_cursor_id);
+        }
+
+        let in_message_view =
+            !self.selected_channel_is_forum() && !self.is_pinned_message_view_active();
+        let should_follow = was_following_cursor && in_message_view;
+        let should_scroll = should_follow || (was_at_latest && in_message_view);
+        if areas.message || areas.navigation {
+            self.repair_message_after_discord_restore(
+                selected_message_id,
+                scroll_message_id,
+                should_follow,
+                should_scroll,
+            );
+        }
+    }
+
+    fn repair_navigation_after_discord_restore(
+        &mut self,
+        channel_cursor_id: Option<Id<ChannelMarker>>,
+    ) {
+        if let Some(user) = self.discord.current_user() {
+            self.discord.current_user = Some(user.to_owned());
+        }
+        if let Some(user_id) = self.discord.current_user_id() {
+            self.discord.current_user_id = Some(user_id);
+        }
+        self.refresh_composer_emoji_candidates_for_current_query();
+
+        self.clamp_active_selection();
+        self.restore_channel_cursor(channel_cursor_id);
+        self.navigation.selected_guild = self.selected_guild();
+        self.navigation.selected_channel = self.selected_channel();
+        self.navigation.selected_member = self.selected_member();
+        self.clamp_guild_viewport();
+        self.clamp_channel_viewport();
+        self.clamp_member_viewport();
+    }
+
+    fn repair_message_after_discord_restore(
+        &mut self,
+        selected_message_id: Option<Id<MessageMarker>>,
+        scroll_message_id: Option<Id<MessageMarker>>,
+        should_follow: bool,
+        should_scroll: bool,
+    ) {
+        self.messages.selected_message = self.selected_message();
+        if should_follow {
+            self.follow_latest_message();
+        } else {
+            self.restore_message_position(selected_message_id, scroll_message_id);
+        }
+        if should_scroll {
+            self.messages.message_auto_follow = true;
+        }
+        self.clamp_message_viewport();
+        if !should_scroll {
+            self.refresh_message_auto_follow();
+        }
+    }
+}
+
+impl DashboardState {
+    pub fn channel_unread(&self, channel_id: Id<ChannelMarker>) -> ChannelUnreadState {
+        self.discord.cache.channel_unread(channel_id)
+    }
+
+    pub fn sidebar_channel_unread(&self, channel_id: Id<ChannelMarker>) -> ChannelUnreadState {
+        self.discord.cache.channel_sidebar_unread(channel_id)
+    }
+
+    pub fn sidebar_guild_unread(&self, guild_id: Id<GuildMarker>) -> ChannelUnreadState {
+        self.discord.cache.guild_sidebar_unread(guild_id)
+    }
+
+    pub fn channel_notification_muted(&self, channel_id: Id<ChannelMarker>) -> bool {
+        self.discord.cache.channel_notification_muted(channel_id)
+    }
+
+    pub fn guild_notification_muted(&self, guild_id: Id<GuildMarker>) -> bool {
+        self.discord.cache.guild_notification_muted(guild_id)
+    }
+
+    pub fn direct_message_unread_count(&self) -> usize {
+        self.discord.cache.direct_message_unread_count()
+    }
+
+    pub fn channel_unread_message_count(&self, channel_id: Id<ChannelMarker>) -> usize {
+        self.discord.cache.channel_unread_message_count(channel_id)
+    }
+}
+
+impl DashboardState {
+    pub(crate) fn desktop_notification_for_event(
+        &self,
+        event: &AppEvent,
+    ) -> Option<DesktopNotification> {
+        let AppEvent::MessageCreate {
+            guild_id,
+            channel_id,
+            author,
+            content,
+            sticker_names,
+            attachments,
+            embeds,
+            ..
+        } = event
+        else {
+            return None;
+        };
+        if !self.desktop_notifications_enabled()
+            || self.navigation.active_channel_id == Some(*channel_id)
+        {
+            return None;
+        }
+        if !self
+            .discord
+            .cache
+            .message_event_triggers_notification(event)
+        {
+            return None;
+        }
+
+        let channel = self.discord.cache.channel(*channel_id);
+        let guild_id = guild_id.or_else(|| channel.and_then(|channel| channel.guild_id));
+        let title = match guild_id.and_then(|guild_id| self.discord.cache.guild(guild_id)) {
+            Some(guild) => {
+                let channel_name = channel
+                    .map(|channel| channel.name.as_str())
+                    .unwrap_or("unknown-channel");
+                format!("{author} in {} #{channel_name}", guild.name)
+            }
+            None => author.clone(),
+        };
+        let body = message_notification_body(
+            content.as_deref(),
+            sticker_names.len(),
+            attachments.len(),
+            embeds.len(),
+        );
+        Some(DesktopNotification { title, body })
+    }
+}
+
+impl DashboardState {
+    pub fn current_user(&self) -> Option<&str> {
+        self.discord.current_user.as_deref()
+    }
+
+    pub fn current_user_id(&self) -> Option<Id<UserMarker>> {
+        self.discord.current_user_id
+    }
+}

@@ -4,7 +4,7 @@ use crate::discord::ids::{
     marker::{GuildMarker, RoleMarker},
 };
 
-use super::{ChannelState, DiscordState};
+use crate::discord::state::{ChannelState, DiscordState};
 
 /// Discord permission bits we currently care about. Mirrors a subset of
 /// Discord's permission bits, kept inline so the state crate
@@ -281,7 +281,7 @@ impl DiscordState {
 /// Whether a Discord channel kind string represents a thread. Mirrors
 /// `ChannelState::is_thread` so that bare `ChannelInfo` inputs can be
 /// classified before they become a `ChannelState`.
-pub(super) fn is_thread_kind(kind: &str) -> bool {
+pub(in crate::discord) fn is_thread_kind(kind: &str) -> bool {
     matches!(
         kind,
         "thread"

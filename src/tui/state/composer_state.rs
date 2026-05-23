@@ -1,5 +1,9 @@
 use std::ops::Range;
 
+use crate::discord::ids::{
+    Id,
+    marker::{ChannelMarker, MessageMarker},
+};
 use crate::discord::{
     ApplicationCommandInfo, ApplicationCommandInvocation, MAX_UPLOAD_ATTACHMENT_COUNT,
     MessageAttachmentUpload, application_command_content_is_complete,
@@ -15,6 +19,53 @@ use super::composer::{
 };
 use super::{CommandPickerEntry, DashboardState, EmojiPickerEntry, FocusPane, MentionPickerEntry};
 use crate::discord::AppCommand;
+
+#[derive(Debug, Default)]
+pub(super) struct ComposerUiState {
+    pub(super) composer_input: String,
+    pub(super) composer_cursor_byte_index: usize,
+    pub(super) pending_composer_attachments: Vec<MessageAttachmentUpload>,
+    pub(super) composer_active: bool,
+    pub(super) reply_target_message_id: Option<Id<MessageMarker>>,
+    pub(super) edit_target_message: Option<(Id<ChannelMarker>, Id<MessageMarker>)>,
+    /// Set when the user is in the middle of an `@mention` autocomplete. The
+    /// stored string is the characters typed *after* the `@` and is used to
+    /// filter the candidate list. `None` means the picker is closed.
+    pub(super) composer_mention_query: Option<String>,
+    pub(super) composer_mention_start: Option<usize>,
+    pub(super) composer_mention_selected: usize,
+    /// Set when the user is typing a Unicode emoji shortcode after `:`. The
+    /// picker opens after two shortcode characters, mirroring Discord's
+    /// threshold while avoiding noisy popups for ordinary punctuation.
+    pub(super) composer_emoji_query: Option<String>,
+    pub(super) composer_emoji_start: Option<usize>,
+    pub(super) composer_emoji_selected: usize,
+    pub(super) composer_emoji_candidates: Vec<EmojiPickerEntry>,
+    pub(super) composer_command_query: Option<String>,
+    pub(super) composer_command_start: Option<usize>,
+    pub(super) composer_command_selected: usize,
+    pub(super) composer_command_candidates: Vec<CommandPickerEntry>,
+    /// Records `@displayname` substrings that the picker inserted, so the
+    /// composer can rewrite them to Discord's `<@USER_ID>` wire format on
+    /// submit even though the visible text is still the friendly form.
+    pub(super) composer_mention_completions: Vec<MentionCompletion>,
+    /// Recorded custom emoji ranges inserted by the picker. The editor keeps
+    /// the readable `:name:` text while submit rewrites these ranges to
+    /// Discord's `<:name:id>` or `<a:name:id>` wire format.
+    pub(super) composer_emoji_completions: Vec<EmojiCompletion>,
+}
+
+impl ComposerUiState {
+    fn composer_cursor_byte_index(&self) -> usize {
+        let mut index = self
+            .composer_cursor_byte_index
+            .min(self.composer_input.len());
+        while index > 0 && !self.composer_input.is_char_boundary(index) {
+            index -= 1;
+        }
+        index
+    }
+}
 
 impl DashboardState {
     pub fn is_composing(&self) -> bool {

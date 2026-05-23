@@ -3,6 +3,7 @@ use crate::config::{
     VoiceOptions,
 };
 use crate::discord::AppCommand;
+use crate::tui::keybindings::KeyBindings;
 
 use super::{
     DashboardState, FocusPane, FolderKey, OptionsCategoryShortcut,
@@ -24,6 +25,33 @@ pub struct DisplayOptionItem {
     pub gauge_percent: Option<u16>,
     pub effective: bool,
     pub description: &'static str,
+}
+
+#[derive(Debug)]
+pub(super) struct OptionsUiState {
+    pub(super) display_options: DisplayOptions,
+    pub(super) notification_options: NotificationOptions,
+    pub(super) voice_options: VoiceOptions,
+    pub(super) key_bindings: KeyBindings,
+    pub(super) options_save_pending: bool,
+}
+
+impl Default for OptionsUiState {
+    fn default() -> Self {
+        Self {
+            display_options: DisplayOptions::default(),
+            notification_options: NotificationOptions::default(),
+            voice_options: VoiceOptions::default(),
+            key_bindings: KeyBindings,
+            options_save_pending: false,
+        }
+    }
+}
+
+impl OptionsUiState {
+    pub(super) fn key_bindings(&self) -> &KeyBindings {
+        &self.key_bindings
+    }
 }
 
 impl DashboardState {

@@ -4,7 +4,7 @@ use crate::discord::ids::{
 };
 use crate::discord::{ChannelInfo, ChannelRecipientInfo, PermissionOverwriteInfo, PresenceStatus};
 
-use super::{DiscordState, permissions};
+use crate::discord::{permission::state as permissions, state::DiscordState};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChannelState {
@@ -164,7 +164,7 @@ impl DiscordState {
         self.navigation.channels.get(&channel_id)
     }
 
-    pub(super) fn channel_guild_id(
+    pub(in crate::discord) fn channel_guild_id(
         &self,
         channel_id: Id<ChannelMarker>,
     ) -> Option<Id<GuildMarker>> {
@@ -174,7 +174,7 @@ impl DiscordState {
             .and_then(|channel| channel.guild_id)
     }
 
-    pub(super) fn upsert_channel(&mut self, channel: &ChannelInfo) {
+    pub(in crate::discord) fn upsert_channel(&mut self, channel: &ChannelInfo) {
         let existing = self.navigation.channels.get(&channel.channel_id);
         let last_message_id = existing
             .and_then(|existing| existing.last_message_id)
@@ -285,7 +285,7 @@ impl DiscordState {
         );
     }
 
-    pub(super) fn refresh_dm_channel_info_from_profile(
+    pub(in crate::discord) fn refresh_dm_channel_info_from_profile(
         &mut self,
         user_id: Id<UserMarker>,
         display_name: &str,
@@ -320,7 +320,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn update_channel_recipient_presence(
+    pub(in crate::discord) fn update_channel_recipient_presence(
         &mut self,
         user_id: Id<UserMarker>,
         status: PresenceStatus,
@@ -334,7 +334,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn record_channel_message_id(
+    pub(in crate::discord) fn record_channel_message_id(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -344,7 +344,10 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn increment_thread_message_counts(&mut self, channel_id: Id<ChannelMarker>) {
+    pub(in crate::discord) fn increment_thread_message_counts(
+        &mut self,
+        channel_id: Id<ChannelMarker>,
+    ) {
         let Some(channel) = self
             .navigation
             .channels

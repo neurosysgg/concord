@@ -4,36 +4,26 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-mod channels;
-mod guilds;
-mod members;
-mod messages;
-mod notifications;
-mod permissions;
-mod profiles;
-mod reads;
-mod voice;
-
 /// Typing indicators stay visible for this long after the latest TYPING_START
 /// from a given user. This matches Discord's documented 10-second window so the
 /// label tracks what other clients show.
-pub(super) const TYPING_INDICATOR_TTL: Duration = Duration::from_secs(10);
+pub(in crate::discord) const TYPING_INDICATOR_TTL: Duration = Duration::from_secs(10);
 
+pub use super::channel::{ChannelRecipientState, ChannelState, ChannelVisibilityStats};
+pub use super::guild::GuildState;
+use super::member::role_map;
+pub use super::member::{GuildMemberState, RoleState, TypingUserState};
+use super::message::{MessageAuthorRoleIds, MessageUpdateFields};
+pub use super::message::{MessageCapabilities, MessageState};
+pub use super::notification::ChannelUnreadState;
+use super::notification::{GuildNotificationSettingsState, MessageNotificationKind};
+use super::profile::{ProfileRoleIds, UserProfileCacheKey};
+use super::read::ChannelReadState;
+pub use super::voice::{CurrentVoiceConnectionState, VoiceParticipantState};
 use crate::discord::ids::{
     Id,
     marker::{ChannelMarker, GuildMarker, RoleMarker, UserMarker},
 };
-pub use channels::{ChannelRecipientState, ChannelState, ChannelVisibilityStats};
-pub use guilds::GuildState;
-use members::role_map;
-pub use members::{GuildMemberState, RoleState, TypingUserState};
-use messages::{MessageAuthorRoleIds, MessageUpdateFields};
-pub use messages::{MessageCapabilities, MessageState};
-pub use notifications::ChannelUnreadState;
-use notifications::{GuildNotificationSettingsState, MessageNotificationKind};
-use profiles::{ProfileRoleIds, UserProfileCacheKey};
-use reads::ChannelReadState;
-pub use voice::{CurrentVoiceConnectionState, VoiceParticipantState};
 
 use super::{
     ActivityInfo, AppEvent, ChannelInfo, CustomEmojiInfo, FriendStatus, GuildFolder,
@@ -46,39 +36,39 @@ const DEFAULT_MAX_MESSAGES_PER_CHANNEL: usize = 200;
 /// Number of recently opened channels whose message bodies stay fully hydrated.
 const DEFAULT_MAX_WARM_MESSAGE_CHANNELS: usize = 10;
 /// Extra older-history window retained while the user scrolls above the newest messages.
-pub(super) const OLDER_HISTORY_EXTRA_WINDOW_MULTIPLIER: usize = 2;
+pub(in crate::discord) const OLDER_HISTORY_EXTRA_WINDOW_MULTIPLIER: usize = 2;
 /// Maximum cached profile payloads kept for quick profile popup reopening.
-pub(super) const MAX_USER_PROFILE_CACHE_ENTRIES: usize = 256;
+pub(in crate::discord) const MAX_USER_PROFILE_CACHE_ENTRIES: usize = 256;
 /// Maximum cached user-note fetch results, including users with no note.
-pub(super) const MAX_FETCHED_NOTE_CACHE_ENTRIES: usize = 256;
+pub(in crate::discord) const MAX_FETCHED_NOTE_CACHE_ENTRIES: usize = 256;
 /// Number of recently selected guilds whose member lists stay fully cached.
-pub(super) const MAX_RECENT_MEMBER_GUILDS: usize = 3;
+pub(in crate::discord) const MAX_RECENT_MEMBER_GUILDS: usize = 3;
 
-pub(super) fn is_fallback_identity(username: Option<&str>, display_name: &str) -> bool {
+pub(in crate::discord) fn is_fallback_identity(username: Option<&str>, display_name: &str) -> bool {
     username.is_none() && display_name == "unknown"
 }
 
 #[derive(Clone, Debug)]
 pub struct DiscordState {
-    navigation: NavigationIndex,
-    message_cache: MessageCache,
-    guild_details: GuildDetailCache,
-    profiles: ProfileCache,
-    presence: PresenceCache,
-    voice: VoiceStateCache,
-    session: SessionState,
-    notifications: NotificationCache,
+    pub(in crate::discord) navigation: NavigationIndex,
+    pub(in crate::discord) message_cache: MessageCache,
+    pub(in crate::discord) guild_details: GuildDetailCache,
+    pub(in crate::discord) profiles: ProfileCache,
+    pub(in crate::discord) presence: PresenceCache,
+    pub(in crate::discord) voice: VoiceStateCache,
+    pub(in crate::discord) session: SessionState,
+    pub(in crate::discord) notifications: NotificationCache,
 }
 
 #[derive(Clone, Debug, Default)]
-struct NavigationIndex {
-    guilds: BTreeMap<Id<GuildMarker>, GuildState>,
-    channels: BTreeMap<Id<ChannelMarker>, ChannelState>,
-    thread_creators: BTreeMap<Id<ChannelMarker>, ThreadCreatorState>,
-    custom_emojis: BTreeMap<Id<GuildMarker>, Vec<CustomEmojiInfo>>,
+pub(in crate::discord) struct NavigationIndex {
+    pub(in crate::discord) guilds: BTreeMap<Id<GuildMarker>, GuildState>,
+    pub(in crate::discord) channels: BTreeMap<Id<ChannelMarker>, ChannelState>,
+    pub(in crate::discord) thread_creators: BTreeMap<Id<ChannelMarker>, ThreadCreatorState>,
+    pub(in crate::discord) custom_emojis: BTreeMap<Id<GuildMarker>, Vec<CustomEmojiInfo>>,
     /// User's `guild_folders` setting in display order. Empty until READY
     /// delivers it. The dashboard falls back to a flat guild list.
-    guild_folders: Vec<GuildFolder>,
+    pub(in crate::discord) guild_folders: Vec<GuildFolder>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -88,14 +78,14 @@ pub struct ThreadCreatorState {
 }
 
 #[derive(Clone, Debug)]
-struct MessageCache {
-    messages: BTreeMap<Id<ChannelMarker>, VecDeque<MessageState>>,
-    cold_message_channels: BTreeSet<Id<ChannelMarker>>,
-    warm_message_channels: VecDeque<Id<ChannelMarker>>,
-    pinned_messages: BTreeMap<Id<ChannelMarker>, VecDeque<MessageState>>,
-    message_author_role_ids: MessageAuthorRoleIds,
-    max_messages_per_channel: usize,
-    max_warm_message_channels: usize,
+pub(in crate::discord) struct MessageCache {
+    pub(in crate::discord) messages: BTreeMap<Id<ChannelMarker>, VecDeque<MessageState>>,
+    pub(in crate::discord) cold_message_channels: BTreeSet<Id<ChannelMarker>>,
+    pub(in crate::discord) warm_message_channels: VecDeque<Id<ChannelMarker>>,
+    pub(in crate::discord) pinned_messages: BTreeMap<Id<ChannelMarker>, VecDeque<MessageState>>,
+    pub(in crate::discord) message_author_role_ids: MessageAuthorRoleIds,
+    pub(in crate::discord) max_messages_per_channel: usize,
+    pub(in crate::discord) max_warm_message_channels: usize,
 }
 
 impl MessageCache {
@@ -113,72 +103,78 @@ impl MessageCache {
 }
 
 #[derive(Clone, Debug, Default)]
-struct GuildDetailCache {
-    members: BTreeMap<Id<GuildMarker>, BTreeMap<Id<UserMarker>, GuildMemberState>>,
-    member_cache_guild_order: VecDeque<Id<GuildMarker>>,
-    roles: BTreeMap<Id<GuildMarker>, BTreeMap<Id<RoleMarker>, RoleState>>,
-    current_user_role_ids: BTreeMap<Id<GuildMarker>, Vec<Id<RoleMarker>>>,
+pub(in crate::discord) struct GuildDetailCache {
+    pub(in crate::discord) members:
+        BTreeMap<Id<GuildMarker>, BTreeMap<Id<UserMarker>, GuildMemberState>>,
+    pub(in crate::discord) member_cache_guild_order: VecDeque<Id<GuildMarker>>,
+    pub(in crate::discord) roles: BTreeMap<Id<GuildMarker>, BTreeMap<Id<RoleMarker>, RoleState>>,
+    pub(in crate::discord) current_user_role_ids: BTreeMap<Id<GuildMarker>, Vec<Id<RoleMarker>>>,
 }
 
 #[derive(Clone, Debug, Default)]
-struct ProfileCache {
-    profile_role_ids: ProfileRoleIds,
+pub(in crate::discord) struct ProfileCache {
+    pub(in crate::discord) profile_role_ids: ProfileRoleIds,
     /// Cached profile lookups so the profile popup can render instantly when
     /// the same user is opened again.
-    user_profiles: BTreeMap<UserProfileCacheKey, UserProfileInfo>,
-    profile_cache_order: VecDeque<UserProfileCacheKey>,
-    fetched_notes: BTreeMap<Id<UserMarker>, Option<String>>,
-    fetched_note_order: VecDeque<Id<UserMarker>>,
+    pub(in crate::discord) user_profiles: BTreeMap<UserProfileCacheKey, UserProfileInfo>,
+    pub(in crate::discord) profile_cache_order: VecDeque<UserProfileCacheKey>,
+    pub(in crate::discord) fetched_notes: BTreeMap<Id<UserMarker>, Option<String>>,
+    pub(in crate::discord) fetched_note_order: VecDeque<Id<UserMarker>>,
     /// Friend / blocked / pending request state delivered through READY's
     /// `relationships` array. Used to colour the profile popup's friend
     /// indicator and to enrich `UserProfileInfo` on insert.
-    relationships: BTreeMap<Id<UserMarker>, RelationshipInfo>,
+    pub(in crate::discord) relationships: BTreeMap<Id<UserMarker>, RelationshipInfo>,
 }
 
 #[derive(Clone, Debug, Default)]
-struct PresenceCache {
+pub(in crate::discord) struct PresenceCache {
     /// Guild-scoped presence and activity. These are keyed by both guild and
     /// user so evicting an old guild can drop its display-heavy presence data
     /// without affecting the same user's DM fallback or another guild.
-    guild_user_presences: BTreeMap<(Id<GuildMarker>, Id<UserMarker>), PresenceStatus>,
-    guild_user_activities: BTreeMap<(Id<GuildMarker>, Id<UserMarker>), Vec<ActivityInfo>>,
+    pub(in crate::discord) guild_user_presences:
+        BTreeMap<(Id<GuildMarker>, Id<UserMarker>), PresenceStatus>,
+    pub(in crate::discord) guild_user_activities:
+        BTreeMap<(Id<GuildMarker>, Id<UserMarker>), Vec<ActivityInfo>>,
     /// Last known global presence by user id. This gives DM/profile views a
     /// fallback when the private-channel recipient payload omitted status.
-    user_presences: BTreeMap<Id<UserMarker>, PresenceStatus>,
-    user_activities: BTreeMap<Id<UserMarker>, Vec<ActivityInfo>>,
+    pub(in crate::discord) user_presences: BTreeMap<Id<UserMarker>, PresenceStatus>,
+    pub(in crate::discord) user_activities: BTreeMap<Id<UserMarker>, Vec<ActivityInfo>>,
     /// Most recent TYPING_START arrival per (channel, user). Discord renews
     /// the indicator every ~10 seconds. Readers filter stale entries, and the
     /// next typing event for a channel prunes its expired entries.
-    typing: BTreeMap<Id<ChannelMarker>, BTreeMap<Id<UserMarker>, TypingIndicator>>,
+    pub(in crate::discord) typing:
+        BTreeMap<Id<ChannelMarker>, BTreeMap<Id<UserMarker>, TypingIndicator>>,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct TypingIndicator {
-    pub(super) started: Instant,
-    pub(super) display_name: Option<String>,
+pub(in crate::discord) struct TypingIndicator {
+    pub(in crate::discord) started: Instant,
+    pub(in crate::discord) display_name: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
-struct VoiceStateCache {
-    states: BTreeMap<(Id<GuildMarker>, Id<UserMarker>), voice::VoiceState>,
+pub(in crate::discord) struct VoiceStateCache {
+    pub(in crate::discord) states:
+        BTreeMap<(Id<GuildMarker>, Id<UserMarker>), super::voice::VoiceState>,
 }
 
 #[derive(Clone, Debug, Default)]
-struct SessionState {
+pub(in crate::discord) struct SessionState {
     /// Snowflake of the authenticated user. Captured from the READY payload
     /// and consulted by `can_view_channel` to look up our own roles and
     /// match member-level permission overwrites.
-    current_user_id: Option<Id<UserMarker>>,
-    current_user: Option<String>,
-    selected_message_channel_known: bool,
-    selected_message_channel_id: Option<Id<ChannelMarker>>,
+    pub(in crate::discord) current_user_id: Option<Id<UserMarker>>,
+    pub(in crate::discord) current_user: Option<String>,
+    pub(in crate::discord) selected_message_channel_known: bool,
+    pub(in crate::discord) selected_message_channel_id: Option<Id<ChannelMarker>>,
 }
 
 #[derive(Clone, Debug, Default)]
-struct NotificationCache {
-    read_states: BTreeMap<Id<ChannelMarker>, ChannelReadState>,
-    notification_settings: BTreeMap<Id<GuildMarker>, GuildNotificationSettingsState>,
-    private_notification_settings: Option<GuildNotificationSettingsState>,
+pub(in crate::discord) struct NotificationCache {
+    pub(in crate::discord) read_states: BTreeMap<Id<ChannelMarker>, ChannelReadState>,
+    pub(in crate::discord) notification_settings:
+        BTreeMap<Id<GuildMarker>, GuildNotificationSettingsState>,
+    pub(in crate::discord) private_notification_settings: Option<GuildNotificationSettingsState>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -206,24 +202,25 @@ pub struct DiscordSnapshot {
 
 #[derive(Clone, Debug)]
 pub struct NavigationSnapshot {
-    navigation: NavigationIndex,
-    guild_details: GuildDetailCache,
-    profiles: ProfileCache,
-    presence: PresenceCache,
-    voice: VoiceStateCache,
-    session: SessionState,
-    notification_settings: BTreeMap<Id<GuildMarker>, GuildNotificationSettingsState>,
-    private_notification_settings: Option<GuildNotificationSettingsState>,
+    pub(in crate::discord) navigation: NavigationIndex,
+    pub(in crate::discord) guild_details: GuildDetailCache,
+    pub(in crate::discord) profiles: ProfileCache,
+    pub(in crate::discord) presence: PresenceCache,
+    pub(in crate::discord) voice: VoiceStateCache,
+    pub(in crate::discord) session: SessionState,
+    pub(in crate::discord) notification_settings:
+        BTreeMap<Id<GuildMarker>, GuildNotificationSettingsState>,
+    pub(in crate::discord) private_notification_settings: Option<GuildNotificationSettingsState>,
 }
 
 #[derive(Clone, Debug)]
 pub struct MessageSnapshot {
-    message_cache: MessageCache,
+    pub(in crate::discord) message_cache: MessageCache,
 }
 
 #[derive(Clone, Debug)]
 pub struct DetailSnapshot {
-    read_states: BTreeMap<Id<ChannelMarker>, ChannelReadState>,
+    pub(in crate::discord) read_states: BTreeMap<Id<ChannelMarker>, ChannelReadState>,
 }
 
 impl SnapshotRevision {
@@ -1311,7 +1308,7 @@ impl DiscordState {
         }
     }
 
-    fn private_user_display_name(
+    pub(in crate::discord) fn private_user_display_name(
         &self,
         user_id: Id<UserMarker>,
         fallback_display_name: Option<&str>,

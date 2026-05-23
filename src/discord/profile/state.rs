@@ -6,22 +6,26 @@ use crate::discord::ids::{
     marker::{GuildMarker, RoleMarker, UserMarker},
 };
 
-use super::DiscordState;
-use super::{MAX_FETCHED_NOTE_CACHE_ENTRIES, MAX_USER_PROFILE_CACHE_ENTRIES};
+use crate::discord::state::DiscordState;
+use crate::discord::state::{MAX_FETCHED_NOTE_CACHE_ENTRIES, MAX_USER_PROFILE_CACHE_ENTRIES};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(super) struct UserProfileCacheKey {
-    pub(super) user_id: Id<UserMarker>,
-    pub(super) guild_id: Option<Id<GuildMarker>>,
+pub(in crate::discord) struct UserProfileCacheKey {
+    pub(in crate::discord) user_id: Id<UserMarker>,
+    pub(in crate::discord) guild_id: Option<Id<GuildMarker>>,
 }
 
 impl UserProfileCacheKey {
-    pub(super) fn new(user_id: Id<UserMarker>, guild_id: Option<Id<GuildMarker>>) -> Self {
+    pub(in crate::discord) fn new(
+        user_id: Id<UserMarker>,
+        guild_id: Option<Id<GuildMarker>>,
+    ) -> Self {
         Self { user_id, guild_id }
     }
 }
 
-pub(super) type ProfileRoleIds = BTreeMap<(Id<GuildMarker>, Id<UserMarker>), Vec<Id<RoleMarker>>>;
+pub(in crate::discord) type ProfileRoleIds =
+    BTreeMap<(Id<GuildMarker>, Id<UserMarker>), Vec<Id<RoleMarker>>>;
 
 impl DiscordState {
     pub fn user_profile(
@@ -46,7 +50,7 @@ impl DiscordState {
         self.session.current_user.as_deref()
     }
 
-    pub(super) fn remember_profile_cache_key(&mut self, key: UserProfileCacheKey) {
+    pub(in crate::discord) fn remember_profile_cache_key(&mut self, key: UserProfileCacheKey) {
         self.profiles
             .profile_cache_order
             .retain(|existing| *existing != key);
@@ -66,7 +70,7 @@ impl DiscordState {
         self.prune_profile_role_ids_without_profiles();
     }
 
-    pub(super) fn remember_fetched_note(&mut self, user_id: Id<UserMarker>) {
+    pub(in crate::discord) fn remember_fetched_note(&mut self, user_id: Id<UserMarker>) {
         self.profiles
             .fetched_note_order
             .retain(|existing| *existing != user_id);
@@ -80,7 +84,7 @@ impl DiscordState {
         self.prune_fetched_note_order();
     }
 
-    pub(super) fn remove_profiles_for_guild(&mut self, guild_id: Id<GuildMarker>) {
+    pub(in crate::discord) fn remove_profiles_for_guild(&mut self, guild_id: Id<GuildMarker>) {
         self.profiles
             .user_profiles
             .retain(|key, _| key.guild_id != Some(guild_id));

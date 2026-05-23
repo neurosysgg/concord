@@ -3,7 +3,7 @@ use crate::discord::ids::{
     marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
 };
 
-use super::PresenceStatus;
+use crate::discord::PresenceStatus;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChannelInfo {

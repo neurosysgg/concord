@@ -4,7 +4,7 @@ use crate::discord::ids::{
 };
 use crate::discord::{CustomEmojiInfo, GuildFolder};
 
-use super::DiscordState;
+use crate::discord::state::DiscordState;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GuildState {
@@ -39,7 +39,7 @@ impl DiscordState {
             .unwrap_or_default()
     }
 
-    pub(super) fn increment_guild_member_count(&mut self, guild_id: Id<GuildMarker>) {
+    pub(in crate::discord) fn increment_guild_member_count(&mut self, guild_id: Id<GuildMarker>) {
         if let Some(count) = self
             .navigation
             .guilds
@@ -50,7 +50,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn decrement_guild_member_count(&mut self, guild_id: Id<GuildMarker>) {
+    pub(in crate::discord) fn decrement_guild_member_count(&mut self, guild_id: Id<GuildMarker>) {
         if let Some(count) = self
             .navigation
             .guilds

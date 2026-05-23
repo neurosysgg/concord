@@ -1,27 +1,27 @@
 mod application_commands;
 mod auth_http;
-mod channels;
+mod channel;
 mod client;
 mod commands;
 mod display_name;
 mod events;
 mod fingerprint;
 mod gateway;
-mod guilds;
+mod guild;
 pub mod ids;
-mod members;
-mod messages;
-mod notifications;
+mod member;
+mod message;
+mod notification;
 pub mod password_auth;
+mod permission;
 mod presence;
-mod profiles;
+mod profile;
 pub mod qr_auth;
-mod reads;
+mod read;
 mod request_lifecycle;
 mod rest;
 mod state;
 mod voice;
-mod voice_types;
 
 pub use application_commands::{
     ApplicationCommandChoiceInfo, ApplicationCommandInfo, ApplicationCommandInteraction,
@@ -29,7 +29,7 @@ pub use application_commands::{
     ApplicationCommandOptionInfo, application_command_content_is_complete,
     application_command_option_scope, parsed_application_command_option_names,
 };
-pub use channels::{
+pub use channel::{
     ChannelInfo, ChannelRecipientInfo, PermissionOverwriteInfo, PermissionOverwriteKind,
     ThreadMetadataInfo,
 };
@@ -41,20 +41,20 @@ pub use commands::{
     MessageAttachmentUpload, ReactionEmoji,
 };
 pub use events::{AppEvent, SequencedAppEvent};
-pub use guilds::{CustomEmojiInfo, GuildFolder};
+pub use guild::{CustomEmojiInfo, GuildFolder};
 pub use ids::{Id, marker};
-pub use members::{MemberInfo, RoleInfo};
-pub use messages::{
+pub use member::{MemberInfo, RoleInfo};
+pub use message::{
     AttachmentInfo, AttachmentUpdate, EmbedFieldInfo, EmbedInfo, InlinePreviewInfo, MentionInfo,
     MessageInfo, MessageInteractionInfo, MessageKind, MessageReferenceInfo, MessageSnapshotInfo,
     PollAnswerInfo, PollInfo, ReactionInfo, ReactionUserInfo, ReactionUsersInfo, ReplyInfo,
 };
-pub use notifications::{
+pub use notification::{
     ChannelNotificationOverrideInfo, GuildNotificationSettingsInfo, NotificationLevel,
 };
 pub use presence::{ActivityEmoji, ActivityInfo, ActivityKind, PresenceStatus};
-pub use profiles::{FriendStatus, MutualGuildInfo, RelationshipInfo, UserProfileInfo};
-pub use reads::ReadStateInfo;
+pub use profile::{FriendStatus, MutualGuildInfo, RelationshipInfo, UserProfileInfo};
+pub use read::ReadStateInfo;
 pub use rest::ForumPostPage;
 pub use state::{
     ChannelRecipientState, ChannelState, ChannelUnreadState, ChannelVisibilityStats,
@@ -62,4 +62,4 @@ pub use state::{
     MessageCapabilities, MessageState, RoleState, SnapshotAreas, SnapshotRevision, TypingUserState,
     VoiceParticipantState,
 };
-pub use voice_types::{VoiceConnectionStatus, VoiceServerInfo, VoiceSoundKind, VoiceStateInfo};
+pub use voice::{VoiceConnectionStatus, VoiceServerInfo, VoiceSoundKind, VoiceStateInfo};

@@ -1,11 +1,100 @@
 use crate::discord::MessageState;
-use crate::discord::ids::{Id, marker::MessageMarker};
+use crate::discord::ids::{
+    Id,
+    marker::{ChannelMarker, MessageMarker},
+};
+use crate::tui::format;
 
 use super::scroll::{
     SCROLL_OFF, clamp_list_scroll, move_index_down, move_index_up, normalize_message_line_scroll,
     pane_content_height, scroll_message_row_down, scroll_message_row_up,
 };
 use super::*;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UnreadBanner {
+    pub since_message_id: Id<MessageMarker>,
+    pub unread_count: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ThreadReturnTarget {
+    pub(super) thread_channel_id: Id<ChannelMarker>,
+    pub(super) channel_id: Id<ChannelMarker>,
+    pub(super) selected_message: usize,
+    pub(super) message_scroll: usize,
+    pub(super) message_line_scroll: usize,
+    pub(super) message_keep_selection_visible: bool,
+    pub(super) message_auto_follow: bool,
+    pub(super) new_messages_marker_message_id: Option<Id<MessageMarker>>,
+    pub(super) unread_divider_last_acked_id: Option<Id<MessageMarker>>,
+    pub(super) pending_unread_anchor_scroll: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct PinnedMessageViewReturnTarget {
+    pub(super) channel_id: Id<ChannelMarker>,
+    pub(super) selected_message: usize,
+    pub(super) message_scroll: usize,
+    pub(super) message_line_scroll: usize,
+    pub(super) message_keep_selection_visible: bool,
+    pub(super) message_auto_follow: bool,
+    pub(super) new_messages_marker_message_id: Option<Id<MessageMarker>>,
+    pub(super) unread_divider_last_acked_id: Option<Id<MessageMarker>>,
+    pub(super) pending_unread_anchor_scroll: bool,
+}
+
+#[derive(Debug)]
+pub(super) struct MessageViewportState {
+    pub(super) selected_message: usize,
+    pub(super) message_scroll: usize,
+    pub(super) message_line_scroll: usize,
+    pub(super) message_keep_selection_visible: bool,
+    pub(super) message_auto_follow: bool,
+    pub(super) new_messages_marker_message_id: Option<Id<MessageMarker>>,
+    /// Snowflake of the last message the user had acked at the moment the
+    /// active channel was opened. Captured *before* the activation-time
+    /// ack so it survives the immediate ack flush, lets the renderer place
+    /// a Discord-style red divider just above the first unread message,
+    /// and lets the scroll math anchor the viewport to the user's
+    /// last-read position once history arrives. `None` when the channel
+    /// had no unread state at activation.
+    pub(super) unread_divider_last_acked_id: Option<Id<MessageMarker>>,
+    /// Set on activation when an unread anchor needs to be applied to the
+    /// viewport once history is available. Cleared the first frame the
+    /// anchor is found among the loaded messages, so subsequent navigation
+    /// is not pinned to the original anchor position.
+    pub(super) pending_unread_anchor_scroll: bool,
+    pub(super) message_view_height: usize,
+    pub(super) message_content_width: usize,
+    pub(super) message_preview_width: u16,
+    pub(super) message_max_preview_height: u16,
+    pub(super) pinned_message_view_channel_id: Option<Id<ChannelMarker>>,
+    pub(super) pinned_message_view_return_target: Option<PinnedMessageViewReturnTarget>,
+    pub(super) thread_return_target: Option<ThreadReturnTarget>,
+}
+
+impl Default for MessageViewportState {
+    fn default() -> Self {
+        Self {
+            selected_message: 0,
+            message_scroll: 0,
+            message_line_scroll: 0,
+            message_keep_selection_visible: true,
+            message_auto_follow: true,
+            new_messages_marker_message_id: None,
+            unread_divider_last_acked_id: None,
+            pending_unread_anchor_scroll: false,
+            message_view_height: 1,
+            message_content_width: usize::MAX,
+            message_preview_width: 0,
+            message_max_preview_height: 0,
+            pinned_message_view_channel_id: None,
+            pinned_message_view_return_target: None,
+            thread_return_target: None,
+        }
+    }
+}
 
 impl DashboardState {
     pub fn selected_message(&self) -> usize {
@@ -757,4 +846,473 @@ impl DashboardState {
             self.messages().len()
         }
     }
+}
+
+impl DashboardState {
+    pub(crate) fn thread_summary_for_message(
+        &self,
+        message: &MessageState,
+    ) -> Option<ThreadSummary> {
+        if message.message_kind.code() != 18 {
+            return None;
+        }
+        let referenced_thread = message
+            .reference
+            .as_ref()
+            .and_then(|reference| reference.channel_id)
+            .and_then(|channel_id| self.discord.cache.channel(channel_id))
+            .filter(|channel| channel.is_thread() && self.discord.cache.can_view_channel(channel));
+        let thread = referenced_thread.or_else(|| {
+            let thread_name = message.content.as_deref()?.trim();
+            if thread_name.is_empty() {
+                return None;
+            }
+            self.discord
+                .cache
+                .viewable_channels_for_guild(message.guild_id)
+                .into_iter()
+                .find(|channel| {
+                    channel.is_thread()
+                        && channel.parent_id == Some(message.channel_id)
+                        && channel.name == thread_name
+                })
+        });
+        thread.map(|channel| {
+            let latest_cached_message = self
+                .discord
+                .messages_for_channel(channel.id)
+                .into_iter()
+                .max_by_key(|message| message.id);
+            let latest_message_id = channel
+                .last_message_id
+                .or_else(|| latest_cached_message.map(|message| message.id));
+            let latest_message_preview = latest_cached_message
+                .filter(|message| Some(message.id) == latest_message_id)
+                .map(|message| ThreadMessagePreview {
+                    author: message.author.clone(),
+                    content: self.thread_message_preview_text(message),
+                });
+            ThreadSummary {
+                channel_id: channel.id,
+                name: channel.name.clone(),
+                message_count: channel.message_count,
+                total_message_sent: channel.total_message_sent,
+                archived: channel.thread_archived(),
+                locked: channel.thread_locked(),
+                latest_message_id,
+                latest_message_preview,
+            }
+        })
+    }
+
+    pub(super) fn thread_message_preview_text(&self, message: &MessageState) -> String {
+        if let Some(content) =
+            message_preview_text(message.content.as_deref(), &message.sticker_names)
+        {
+            return self
+                .render_user_mentions(message.guild_id, &message.mentions, &content)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+        }
+
+        if !message.attachments.is_empty() {
+            return "[attachment]".to_owned();
+        }
+
+        if message.content.is_some() {
+            "<empty message>".to_owned()
+        } else {
+            "<message content unavailable>".to_owned()
+        }
+    }
+
+    pub(crate) fn render_user_mentions(
+        &self,
+        guild_id: Option<Id<GuildMarker>>,
+        mentions: &[MentionInfo],
+        value: &str,
+    ) -> String {
+        let value = if self.show_custom_emoji() {
+            replace_custom_emoji_markup(value)
+        } else {
+            format::replace_custom_emoji_markup_with_ids(value)
+        };
+        render_user_mentions(
+            &value,
+            |user_id| self.resolve_mention_display_name(guild_id, mentions, user_id),
+            |role_id| self.resolve_role_mention_name(guild_id, role_id),
+            |channel_id| self.resolve_channel_mention_name(channel_id),
+        )
+    }
+
+    pub(crate) fn render_user_mentions_with_highlights(
+        &self,
+        guild_id: Option<Id<GuildMarker>>,
+        mentions: &[MentionInfo],
+        value: &str,
+    ) -> RenderedText {
+        let current_user_id = self.discord.current_user_id.map(|id| id.get());
+        let mut rendered = render_user_mentions_with_highlights(
+            value,
+            |user_id| self.resolve_mention_display_name(guild_id, mentions, user_id),
+            |role_id| self.resolve_role_mention_name(guild_id, role_id),
+            |channel_id| self.resolve_channel_mention_name(channel_id),
+            |target| match target {
+                MentionTarget::User(user_id) => {
+                    if current_user_id == Some(user_id) {
+                        Some(TextHighlightKind::SelfMention)
+                    } else {
+                        Some(TextHighlightKind::OtherMention)
+                    }
+                }
+                // Discord notifies role members on a role mention, but
+                // computing the membership check here would require the
+                // current user's role list. For the highlight pass we treat
+                // every role mention as informational. The message-level
+                // mention notification still drives self-targeted styling
+                // through the literal `@everyone`/`@here` pass below when
+                // those are used.
+                MentionTarget::Role(_) => Some(TextHighlightKind::OtherMention),
+                // Channel mentions never notify, but we still highlight them
+                // like role mentions so `#channel-name` stays distinct.
+                MentionTarget::Channel(_) => Some(TextHighlightKind::OtherMention),
+            },
+        );
+        if current_user_id.is_some() {
+            add_literal_mention_highlights(&mut rendered, "@everyone");
+            add_literal_mention_highlights(&mut rendered, "@here");
+        }
+        normalize_text_highlights(&mut rendered.highlights);
+        format::replace_custom_emoji_markup_in_rendered_with_images(
+            rendered,
+            self.show_custom_emoji(),
+        )
+    }
+
+    fn resolve_role_mention_name(
+        &self,
+        guild_id: Option<Id<GuildMarker>>,
+        role_id: u64,
+    ) -> Option<String> {
+        let guild_id = guild_id?;
+        self.discord
+            .cache
+            .roles_for_guild(guild_id)
+            .into_iter()
+            .find(|role| role.id.get() == role_id)
+            .map(|role| role.name.clone())
+    }
+
+    fn resolve_channel_mention_name(&self, channel_id: u64) -> Option<String> {
+        // `parse_mention` already rejects zero ids, so the `Id::new` call
+        // never sees the forbidden value.
+        let id = Id::<ChannelMarker>::new(channel_id);
+        self.discord
+            .cache
+            .channel(id)
+            .map(|channel| channel.name.clone())
+    }
+
+    fn resolve_mention_display_name(
+        &self,
+        guild_id: Option<Id<GuildMarker>>,
+        mentions: &[MentionInfo],
+        user_id: u64,
+    ) -> Option<String> {
+        let mention = mentions
+            .iter()
+            .find(|mention| mention.user_id.get() == user_id);
+        if let Some(guild_nick) = mention.and_then(|mention| mention.guild_nick.as_deref()) {
+            return Some(guild_nick.to_owned());
+        }
+        if let Some(display_name) = guild_id.and_then(|guild_id| {
+            let user_id = Id::<UserMarker>::new(user_id);
+            self.discord.cache.member_display_name(guild_id, user_id)
+        }) {
+            return Some(display_name.to_owned());
+        }
+        mention.map(|mention| mention.display_name.clone())
+    }
+
+    pub(crate) fn forwarded_snapshot_mention_guild_id(
+        &self,
+        snapshot: &MessageSnapshotInfo,
+    ) -> Option<Id<GuildMarker>> {
+        snapshot
+            .source_channel_id
+            .and_then(|channel_id| self.discord.cache.channel(channel_id))
+            .and_then(|channel| channel.guild_id)
+    }
+
+    pub(super) fn record_thread_channel_upserted(&mut self, channel: &crate::discord::ChannelInfo) {
+        let is_thread = matches!(
+            channel.kind.as_str(),
+            "thread" | "GuildPublicThread" | "GuildPrivateThread" | "GuildNewsThread"
+        );
+        if !is_thread {
+            return;
+        }
+        let Some(parent_id) = channel.parent_id else {
+            return;
+        };
+        let Some(list) = self.requests.forum_post_lists.get_mut(&parent_id) else {
+            return;
+        };
+        let id = channel.channel_id;
+        if list.active_post_ids.contains(&id) || list.archived_post_ids.contains(&id) {
+            return;
+        }
+        if channel.thread_archived() == Some(true) {
+            list.archived_post_ids.insert(0, id);
+        } else {
+            list.active_post_ids.insert(0, id);
+        }
+    }
+
+    pub(super) fn record_forum_posts_loaded(
+        &mut self,
+        channel_id: Id<ChannelMarker>,
+        archive_state: ForumPostArchiveState,
+        offset: usize,
+        threads: &[crate::discord::ChannelInfo],
+        has_more: bool,
+    ) {
+        let list = self
+            .requests
+            .forum_post_lists
+            .entry(channel_id)
+            .or_default();
+        if archive_state == ForumPostArchiveState::Active && offset == 0 {
+            list.active_post_ids.clear();
+            if self.navigation.active_channel_id == Some(channel_id) {
+                self.messages.selected_message = 0;
+                self.messages.message_scroll = 0;
+                self.messages.message_line_scroll = 0;
+                self.messages.message_auto_follow = false;
+            }
+        } else if archive_state == ForumPostArchiveState::Archived && offset == 0 {
+            list.archived_post_ids.clear();
+        }
+        for thread in threads {
+            let thread_id = thread.channel_id;
+            match archive_state {
+                ForumPostArchiveState::Active => {
+                    list.archived_post_ids.retain(|id| *id != thread_id);
+                    if !list.active_post_ids.contains(&thread_id) {
+                        list.active_post_ids.push(thread_id);
+                    }
+                }
+                ForumPostArchiveState::Archived => {
+                    if !list.active_post_ids.contains(&thread_id)
+                        && !list.archived_post_ids.contains(&thread_id)
+                    {
+                        list.archived_post_ids.push(thread_id);
+                    }
+                }
+            }
+        }
+        list.has_more = match archive_state {
+            // Once active search is exhausted, the archived search stream may
+            // still have old forum posts. Keep the UI asking for more until an
+            // archived page says it is exhausted.
+            ForumPostArchiveState::Active => true,
+            ForumPostArchiveState::Archived => has_more,
+        };
+    }
+
+    pub fn messages(&self) -> Vec<&MessageState> {
+        if self.selected_channel_is_forum() {
+            return Vec::new();
+        }
+        if self.messages.pinned_message_view_channel_id == self.selected_channel_id() {
+            return self.pinned_messages();
+        }
+        self.channel_messages()
+    }
+
+    pub fn pinned_messages(&self) -> Vec<&MessageState> {
+        if self.selected_channel_is_forum() {
+            return Vec::new();
+        }
+        self.selected_channel_id()
+            .map(|channel_id| self.discord.cache.pinned_messages_for_channel(channel_id))
+            .unwrap_or_default()
+    }
+
+    fn channel_messages(&self) -> Vec<&MessageState> {
+        self.selected_channel_id()
+            .map(|channel_id| self.discord.cache.messages_for_channel(channel_id))
+            .unwrap_or_default()
+    }
+
+    pub fn enter_pinned_message_view(&mut self, channel_id: Id<ChannelMarker>) {
+        if !self.is_pinned_message_view_active() {
+            self.record_pinned_message_view_return_target(channel_id);
+        }
+        self.messages.pinned_message_view_channel_id = Some(channel_id);
+        self.messages.selected_message = 0;
+        self.messages.message_scroll = 0;
+        self.messages.message_line_scroll = 0;
+        self.messages.message_auto_follow = false;
+        self.clear_new_messages_marker();
+        self.messages.message_keep_selection_visible = true;
+        self.clamp_message_viewport();
+    }
+
+    fn record_pinned_message_view_return_target(&mut self, channel_id: Id<ChannelMarker>) {
+        if self.selected_channel_id() != Some(channel_id) {
+            return;
+        }
+        self.messages.pinned_message_view_return_target = Some(PinnedMessageViewReturnTarget {
+            channel_id,
+            selected_message: self.messages.selected_message,
+            message_scroll: self.messages.message_scroll,
+            message_line_scroll: self.messages.message_line_scroll,
+            message_keep_selection_visible: self.messages.message_keep_selection_visible,
+            message_auto_follow: self.messages.message_auto_follow,
+            new_messages_marker_message_id: self.messages.new_messages_marker_message_id,
+            unread_divider_last_acked_id: self.messages.unread_divider_last_acked_id,
+            pending_unread_anchor_scroll: self.messages.pending_unread_anchor_scroll,
+        });
+    }
+
+    pub fn return_from_pinned_message_view(&mut self) -> bool {
+        if !self.is_pinned_message_view_active() {
+            return false;
+        }
+        let Some(target) = self.messages.pinned_message_view_return_target else {
+            return false;
+        };
+        if self.selected_channel_id() != Some(target.channel_id) {
+            self.messages.pinned_message_view_return_target = None;
+            return false;
+        }
+
+        self.messages.pinned_message_view_channel_id = None;
+        self.messages.pinned_message_view_return_target = None;
+        self.messages.selected_message = target.selected_message;
+        self.messages.message_scroll = target.message_scroll;
+        self.messages.message_line_scroll = target.message_line_scroll;
+        self.messages.message_keep_selection_visible = target.message_keep_selection_visible;
+        self.messages.message_auto_follow = target.message_auto_follow;
+        self.messages.new_messages_marker_message_id = target.new_messages_marker_message_id;
+        self.messages.unread_divider_last_acked_id = target.unread_divider_last_acked_id;
+        self.messages.pending_unread_anchor_scroll = target.pending_unread_anchor_scroll;
+        self.clamp_message_viewport();
+        true
+    }
+
+    pub(super) fn is_pinned_message_view_active(&self) -> bool {
+        self.messages
+            .pinned_message_view_channel_id
+            .is_some_and(|channel_id| Some(channel_id) == self.selected_channel_id())
+    }
+
+    pub fn pinned_message_view_channel_id(&self) -> Option<Id<ChannelMarker>> {
+        self.is_pinned_message_view_active()
+            .then_some(self.messages.pinned_message_view_channel_id?)
+    }
+
+    #[cfg(test)]
+    pub fn is_pinned_message_view(&self) -> bool {
+        self.is_pinned_message_view_active()
+    }
+
+    pub fn selected_message_state(&self) -> Option<&MessageState> {
+        if self.selected_channel_is_forum() {
+            return None;
+        }
+        self.messages().get(self.selected_message()).copied()
+    }
+
+    pub(crate) fn reply_target_message_state(&self) -> Option<&MessageState> {
+        let message_id = self.composer.reply_target_message_id?;
+        self.messages()
+            .into_iter()
+            .find(|message| message.id == message_id)
+    }
+
+    pub fn next_older_history_command(&mut self) -> Option<AppCommand> {
+        if self.is_pinned_message_view_active() {
+            return None;
+        }
+        let channel_id = self.selected_channel_id()?;
+        let before = self.older_history_cursor()?;
+        Some(AppCommand::LoadMessageHistory {
+            channel_id,
+            before: Some(before),
+        })
+    }
+
+    fn older_history_cursor(&self) -> Option<Id<MessageMarker>> {
+        if self.navigation.focus != FocusPane::Messages
+            || self.messages().is_empty()
+            || self.selected_message() != 0
+        {
+            return None;
+        }
+
+        self.messages().first().map(|message| message.id)
+    }
+
+    pub fn missing_thread_preview_load_requests(
+        &self,
+    ) -> Vec<(Id<ChannelMarker>, Id<MessageMarker>)> {
+        let mut seen = HashSet::new();
+        self.visible_messages()
+            .into_iter()
+            .filter_map(|message| {
+                let summary = self.thread_summary_for_message(message)?;
+                let latest_message_id = summary.latest_message_id?;
+                summary
+                    .latest_message_preview
+                    .is_none()
+                    .then_some((summary.channel_id, latest_message_id))
+            })
+            .filter(|key| seen.insert(*key))
+            .collect()
+    }
+}
+
+impl DashboardState {
+    pub(super) fn active_channel_message_create(
+        &self,
+        event: &AppEvent,
+    ) -> Option<(Id<ChannelMarker>, Id<MessageMarker>)> {
+        let AppEvent::MessageCreate {
+            channel_id,
+            message_id,
+            ..
+        } = event
+        else {
+            return None;
+        };
+        (Some(*channel_id) == self.navigation.active_channel_id)
+            .then_some((*channel_id, *message_id))
+    }
+
+    pub(super) fn event_is_self_message_in_active_channel(&self, event: &AppEvent) -> bool {
+        let AppEvent::MessageCreate {
+            author_id,
+            channel_id,
+            ..
+        } = event
+        else {
+            return false;
+        };
+        Some(*author_id) == self.discord.current_user_id
+            && Some(*channel_id) == self.navigation.active_channel_id
+    }
+}
+
+fn message_preview_text(content: Option<&str>, sticker_names: &[String]) -> Option<String> {
+    content
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_owned)
+        .or_else(|| {
+            sticker_names
+                .first()
+                .map(|name| format!("[Sticker: {name}]"))
+        })
 }

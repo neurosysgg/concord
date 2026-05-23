@@ -3,13 +3,13 @@ use crate::discord::ids::{
     marker::{ChannelMarker, MessageMarker},
 };
 
-use super::DiscordState;
+use crate::discord::state::DiscordState;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(super) struct ChannelReadState {
-    pub(super) last_acked_message_id: Option<Id<MessageMarker>>,
-    pub(super) mention_count: u32,
-    pub(super) notification_count: u32,
+pub(in crate::discord) struct ChannelReadState {
+    pub(in crate::discord) last_acked_message_id: Option<Id<MessageMarker>>,
+    pub(in crate::discord) mention_count: u32,
+    pub(in crate::discord) notification_count: u32,
 }
 
 impl DiscordState {
@@ -65,7 +65,7 @@ impl DiscordState {
             .and_then(|state| state.last_acked_message_id)
     }
 
-    pub(super) fn mark_message_read_locally(
+    pub(in crate::discord) fn mark_message_read_locally(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,

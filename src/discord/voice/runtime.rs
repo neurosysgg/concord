@@ -1,0 +1,256 @@
+use super::*;
+
+#[derive(Debug, Eq, PartialEq)]
+pub(super) enum VoiceRuntimeAction {
+    Connect(VoiceGatewaySession),
+    Close,
+}
+
+#[derive(Default)]
+pub(super) struct VoiceRuntimeState {
+    current_user_id: Option<Id<UserMarker>>,
+    requested: Option<CurrentVoiceConnectionState>,
+    current_voice: Option<ObservedSelfVoiceState>,
+    server: Option<VoiceServerInfo>,
+    active: Option<VoiceGatewaySession>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ObservedSelfVoiceState {
+    guild_id: Id<GuildMarker>,
+    channel_id: Id<ChannelMarker>,
+    session_id: String,
+}
+
+impl VoiceRuntimeState {
+    pub(super) fn apply(&mut self, event: VoiceRuntimeEvent) -> Option<VoiceRuntimeAction> {
+        match event {
+            VoiceRuntimeEvent::Requested(requested) => {
+                if let Some(next) = requested
+                    && self.requested.is_some_and(|current| {
+                        current.guild_id != next.guild_id || current.channel_id != next.channel_id
+                    })
+                {
+                    self.server = None;
+                }
+                self.requested = requested;
+                if self.requested.is_none() {
+                    self.current_voice = None;
+                    self.server = None;
+                    return self.close_active();
+                }
+            }
+            VoiceRuntimeEvent::CurrentUserReady(user_id) => {
+                self.current_user_id = user_id;
+            }
+            VoiceRuntimeEvent::VoiceState(state) => {
+                if let Some(action) = self.record_voice_state(state) {
+                    return Some(action);
+                }
+            }
+            VoiceRuntimeEvent::VoiceServer(server) => {
+                if server.endpoint.is_none() {
+                    self.server = None;
+                    return self.close_active();
+                }
+                self.server = Some(server);
+            }
+            VoiceRuntimeEvent::ConnectionEnded {
+                guild_id,
+                channel_id,
+                session_id,
+                endpoint,
+            } => {
+                if self.active.as_ref().is_some_and(|active| {
+                    active.matches_connection_end(guild_id, channel_id, &session_id, &endpoint)
+                }) {
+                    self.active = None;
+                    return self.connect_if_ready();
+                }
+                return None;
+            }
+            VoiceRuntimeEvent::Shutdown => return self.close_active(),
+        }
+
+        self.connect_if_ready()
+    }
+
+    fn record_voice_state(&mut self, state: VoiceStateInfo) -> Option<VoiceRuntimeAction> {
+        if self.current_user_id != Some(state.user_id) {
+            return None;
+        }
+        let requested = self.requested?;
+        if state.guild_id != requested.guild_id {
+            return None;
+        }
+        let Some(channel_id) = state.channel_id else {
+            self.current_voice = None;
+            self.server = None;
+            return self.close_active();
+        };
+        let session_id = state
+            .session_id
+            .filter(|session_id| !session_id.is_empty())?;
+        self.current_voice = Some(ObservedSelfVoiceState {
+            guild_id: state.guild_id,
+            channel_id,
+            session_id,
+        });
+        None
+    }
+
+    fn connect_if_ready(&mut self) -> Option<VoiceRuntimeAction> {
+        let requested = self.requested?;
+        let voice = self.current_voice.as_ref()?;
+        if requested.guild_id != voice.guild_id || requested.channel_id != voice.channel_id {
+            return self.close_active();
+        }
+        let server = self.server.as_ref()?;
+        if server.guild_id != requested.guild_id {
+            return None;
+        }
+        let endpoint = server.endpoint.as_ref()?.trim_end_matches('/').to_owned();
+        if endpoint.is_empty() || server.token.is_empty() {
+            return None;
+        }
+        let session = VoiceGatewaySession {
+            guild_id: requested.guild_id,
+            channel_id: requested.channel_id,
+            user_id: self.current_user_id?,
+            session_id: voice.session_id.clone(),
+            endpoint,
+            token: server.token.clone(),
+        };
+        if self.active.as_ref() == Some(&session) {
+            return None;
+        }
+        self.active = Some(session.clone());
+        Some(VoiceRuntimeAction::Connect(session))
+    }
+
+    fn close_active(&mut self) -> Option<VoiceRuntimeAction> {
+        self.active.take().map(|_| VoiceRuntimeAction::Close)
+    }
+
+    pub(super) fn capture_gate(&self) -> Option<VoiceCaptureGate> {
+        let active = self.active.as_ref()?;
+        let requested = self.requested?;
+        if active.guild_id != requested.guild_id || active.channel_id != requested.channel_id {
+            return None;
+        }
+        Some(VoiceCaptureGate {
+            enabled: requested.allow_microphone_transmit && !requested.self_mute,
+            microphone_sensitivity: requested.microphone_sensitivity,
+            microphone_volume: requested.microphone_volume,
+        })
+    }
+
+    pub(super) fn playback_gate(&self) -> Option<VoicePlaybackGate> {
+        let active = self.active.as_ref()?;
+        let requested = self.requested?;
+        if active.guild_id != requested.guild_id || active.channel_id != requested.channel_id {
+            return None;
+        }
+        Some(VoicePlaybackGate {
+            enabled: !requested.self_deaf,
+            volume: requested.voice_output_volume,
+        })
+    }
+}
+
+pub(crate) fn forward_app_event(
+    sender: &mpsc::UnboundedSender<VoiceRuntimeEvent>,
+    event: &AppEvent,
+) {
+    let runtime_event = match event {
+        AppEvent::Ready { user_id, .. } => VoiceRuntimeEvent::CurrentUserReady(*user_id),
+        AppEvent::VoiceStateUpdate { state } => VoiceRuntimeEvent::VoiceState(state.clone()),
+        AppEvent::VoiceServerUpdate { server } => VoiceRuntimeEvent::VoiceServer(server.clone()),
+        _ => return,
+    };
+    let _ = sender.send(runtime_event);
+}
+
+pub(crate) async fn run_voice_runtime(
+    mut events: mpsc::UnboundedReceiver<VoiceRuntimeEvent>,
+    events_tx: mpsc::UnboundedSender<VoiceRuntimeEvent>,
+    status_publisher: VoiceStatusPublisher,
+) {
+    let mut state = VoiceRuntimeState::default();
+    let mut connection_task: Option<JoinHandle<()>> = None;
+    let mut capture_gate_tx: Option<mpsc::UnboundedSender<VoiceCaptureGate>> = None;
+    let mut playback_gate_tx: Option<mpsc::UnboundedSender<VoicePlaybackGate>> = None;
+
+    while let Some(event) = events.recv().await {
+        let shutdown = matches!(event, VoiceRuntimeEvent::Shutdown);
+        if let Some(action) = state.apply(event) {
+            match action {
+                VoiceRuntimeAction::Connect(session) => {
+                    if let Some(task) = connection_task.take() {
+                        logging::debug(
+                            "voice",
+                            "aborting previous voice connection task before reconnect",
+                        );
+                        task.abort();
+                    }
+                    let (next_capture_gate_tx, capture_gate_rx) = mpsc::unbounded_channel();
+                    let (next_playback_gate_tx, playback_gate_rx) = mpsc::unbounded_channel();
+                    capture_gate_tx = Some(next_capture_gate_tx);
+                    playback_gate_tx = Some(next_playback_gate_tx);
+                    let initial_capture_gate = state.capture_gate().unwrap_or(VoiceCaptureGate {
+                        enabled: false,
+                        microphone_sensitivity: MicrophoneSensitivityDb::default(),
+                        microphone_volume: VoiceVolumePercent::default(),
+                    });
+                    let initial_playback_gate =
+                        state.playback_gate().unwrap_or(VoicePlaybackGate {
+                            enabled: true,
+                            volume: VoiceVolumePercent::default(),
+                        });
+                    connection_task = Some(tokio::spawn(run_voice_gateway_session(
+                        session,
+                        events_tx.clone(),
+                        status_publisher.clone(),
+                        initial_capture_gate,
+                        capture_gate_rx,
+                        initial_playback_gate,
+                        playback_gate_rx,
+                    )));
+                }
+                VoiceRuntimeAction::Close => {
+                    if let Some(task) = connection_task.take() {
+                        logging::debug("voice", "aborting active voice connection task");
+                        task.abort();
+                    }
+                    capture_gate_tx = None;
+                    playback_gate_tx = None;
+                }
+            }
+        }
+        if state.active.is_none() {
+            capture_gate_tx = None;
+            playback_gate_tx = None;
+        }
+        if let (Some(capture_gate_tx), Some(capture_gate)) =
+            (capture_gate_tx.as_ref(), state.capture_gate())
+        {
+            let _ = capture_gate_tx.send(capture_gate);
+        }
+        if let (Some(playback_gate_tx), Some(playback_gate)) =
+            (playback_gate_tx.as_ref(), state.playback_gate())
+        {
+            let _ = playback_gate_tx.send(playback_gate);
+        }
+        if shutdown {
+            break;
+        }
+    }
+
+    if let Some(task) = connection_task {
+        logging::debug(
+            "voice",
+            "aborting voice connection task during voice runtime shutdown",
+        );
+        task.abort();
+    }
+}

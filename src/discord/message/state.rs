@@ -10,10 +10,10 @@ use crate::discord::{
     PollInfo, ReactionEmoji, ReactionInfo, ReplyInfo,
 };
 
-use super::{
-    DiscordState, OLDER_HISTORY_EXTRA_WINDOW_MULTIPLIER, is_fallback_identity,
-    members::{selected_member_role_color, selected_role_ids_color},
-    profiles::UserProfileCacheKey,
+use crate::discord::{
+    member::{selected_member_role_color, selected_role_ids_color},
+    profile::UserProfileCacheKey,
+    state::{DiscordState, OLDER_HISTORY_EXTRA_WINDOW_MULTIPLIER, is_fallback_identity},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -80,7 +80,7 @@ pub struct MessageCapabilities {
 }
 
 impl MessageState {
-    pub(super) fn redact_body(&mut self) {
+    pub(in crate::discord) fn redact_body(&mut self) {
         self.reference = None;
         self.reply = None;
         self.poll = None;
@@ -165,24 +165,24 @@ impl MessageState {
     }
 }
 
-pub(super) type MessageAuthorRoleIds =
+pub(in crate::discord) type MessageAuthorRoleIds =
     BTreeMap<(Id<ChannelMarker>, Id<MessageMarker>), Vec<Id<RoleMarker>>>;
 
-pub(super) struct MessageUpdateFields {
-    pub(super) poll: Option<PollInfo>,
-    pub(super) content: Option<String>,
-    pub(super) sticker_names: Option<Vec<String>>,
-    pub(super) mentions: Option<Vec<MentionInfo>>,
-    pub(super) attachments: AttachmentUpdate,
-    pub(super) embeds: Option<Vec<EmbedInfo>>,
-    pub(super) edited_timestamp: Option<String>,
-    pub(super) pinned: Option<bool>,
-    pub(super) reactions: Option<Vec<ReactionInfo>>,
-    pub(super) retain_body: bool,
+pub(in crate::discord) struct MessageUpdateFields {
+    pub(in crate::discord) poll: Option<PollInfo>,
+    pub(in crate::discord) content: Option<String>,
+    pub(in crate::discord) sticker_names: Option<Vec<String>>,
+    pub(in crate::discord) mentions: Option<Vec<MentionInfo>>,
+    pub(in crate::discord) attachments: AttachmentUpdate,
+    pub(in crate::discord) embeds: Option<Vec<EmbedInfo>>,
+    pub(in crate::discord) edited_timestamp: Option<String>,
+    pub(in crate::discord) pinned: Option<bool>,
+    pub(in crate::discord) reactions: Option<Vec<ReactionInfo>>,
+    pub(in crate::discord) retain_body: bool,
 }
 
 impl DiscordState {
-    pub(super) fn should_retain_live_message_body(
+    pub(in crate::discord) fn should_retain_live_message_body(
         &self,
         channel_id: Id<ChannelMarker>,
         author_id: Id<UserMarker>,
@@ -196,7 +196,7 @@ impl DiscordState {
             || self.should_retain_channel_message_body(channel_id)
     }
 
-    pub(super) fn retained_live_message_warms_channel(
+    pub(in crate::discord) fn retained_live_message_warms_channel(
         &self,
         channel_id: Id<ChannelMarker>,
     ) -> bool {
@@ -215,13 +215,16 @@ impl DiscordState {
             .contains(&channel_id)
     }
 
-    pub(super) fn should_retain_channel_message_body(&self, channel_id: Id<ChannelMarker>) -> bool {
+    pub(in crate::discord) fn should_retain_channel_message_body(
+        &self,
+        channel_id: Id<ChannelMarker>,
+    ) -> bool {
         !self.session.selected_message_channel_known
             || self.session.selected_message_channel_id == Some(channel_id)
             || self.channel_message_bodies_are_warm(channel_id)
     }
 
-    pub(super) fn should_retain_message_update_body(
+    pub(in crate::discord) fn should_retain_message_update_body(
         &self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -242,7 +245,10 @@ impl DiscordState {
             .unwrap_or_default()
     }
 
-    pub(super) fn redact_channel_message_bodies(&mut self, channel_id: Id<ChannelMarker>) {
+    pub(in crate::discord) fn redact_channel_message_bodies(
+        &mut self,
+        channel_id: Id<ChannelMarker>,
+    ) {
         let Some(messages) = self.message_cache.messages.get_mut(&channel_id) else {
             return;
         };
@@ -251,7 +257,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn touch_warm_message_channel(&mut self, channel_id: Id<ChannelMarker>) {
+    pub(in crate::discord) fn touch_warm_message_channel(&mut self, channel_id: Id<ChannelMarker>) {
         self.message_cache
             .warm_message_channels
             .retain(|warm_channel_id| *warm_channel_id != channel_id);
@@ -375,7 +381,7 @@ impl DiscordState {
                 .contains_key(&(channel_id, message_id))
     }
 
-    pub(super) fn message_author_display_name(
+    pub(in crate::discord) fn message_author_display_name(
         &self,
         guild_id: Option<Id<GuildMarker>>,
         author_id: Id<UserMarker>,
@@ -399,7 +405,7 @@ impl DiscordState {
             .unwrap_or_else(|| fallback.to_owned())
     }
 
-    pub(super) fn message_author_avatar_url(
+    pub(in crate::discord) fn message_author_avatar_url(
         &self,
         guild_id: Option<Id<GuildMarker>>,
         author_id: Id<UserMarker>,
@@ -438,7 +444,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn refresh_message_author_display_name(
+    pub(in crate::discord) fn refresh_message_author_display_name(
         &mut self,
         guild_id: Id<GuildMarker>,
         member: &MemberInfo,
@@ -485,7 +491,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn refresh_message_author_from_profile(
+    pub(in crate::discord) fn refresh_message_author_from_profile(
         &mut self,
         guild_id: Option<Id<GuildMarker>>,
         user_id: Id<UserMarker>,
@@ -509,7 +515,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn upsert_message(&mut self, mut message: MessageState) {
+    pub(in crate::discord) fn upsert_message(&mut self, mut message: MessageState) {
         let channel_id = message.channel_id;
         let message_id = message.id;
         message.guild_id = message
@@ -575,7 +581,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn add_reaction(
+    pub(in crate::discord) fn add_reaction(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -586,7 +592,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn remove_reaction(
+    pub(in crate::discord) fn remove_reaction(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -597,7 +603,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn add_gateway_reaction(
+    pub(in crate::discord) fn add_gateway_reaction(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -610,7 +616,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn remove_gateway_reaction(
+    pub(in crate::discord) fn remove_gateway_reaction(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -623,7 +629,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn clear_gateway_reactions(
+    pub(in crate::discord) fn clear_gateway_reactions(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -633,7 +639,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn clear_gateway_reaction_emoji(
+    pub(in crate::discord) fn clear_gateway_reaction_emoji(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -644,7 +650,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn update_current_user_poll_vote(
+    pub(in crate::discord) fn update_current_user_poll_vote(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -655,7 +661,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn merge_message_history(
+    pub(in crate::discord) fn merge_message_history(
         &mut self,
         channel_id: Id<ChannelMarker>,
         before: Option<Id<MessageMarker>>,
@@ -723,7 +729,7 @@ impl DiscordState {
             .saturating_mul(OLDER_HISTORY_EXTRA_WINDOW_MULTIPLIER)
     }
 
-    pub(super) fn replace_pinned_messages(
+    pub(in crate::discord) fn replace_pinned_messages(
         &mut self,
         channel_id: Id<ChannelMarker>,
         pins: &[MessageInfo],
@@ -813,7 +819,7 @@ impl DiscordState {
             .is_some_and(|messages| messages.iter().any(|message| message.id == message_id))
     }
 
-    pub(super) fn update_message(
+    pub(in crate::discord) fn update_message(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -824,7 +830,7 @@ impl DiscordState {
         });
     }
 
-    pub(super) fn set_cached_message_pinned(
+    pub(in crate::discord) fn set_cached_message_pinned(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -871,7 +877,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn delete_message(
+    pub(in crate::discord) fn delete_message(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
@@ -879,7 +885,7 @@ impl DiscordState {
         self.delete_messages(channel_id, &[message_id]);
     }
 
-    pub(super) fn delete_messages(
+    pub(in crate::discord) fn delete_messages(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_ids: &[Id<MessageMarker>],
@@ -902,7 +908,7 @@ impl DiscordState {
         );
     }
 
-    pub(super) fn record_author_role_ids(
+    pub(in crate::discord) fn record_author_role_ids(
         &mut self,
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,

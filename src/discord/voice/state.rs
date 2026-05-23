@@ -7,7 +7,7 @@ use crate::discord::ids::{
 };
 use crate::discord::{VoiceSoundKind, VoiceStateInfo};
 
-use super::DiscordState;
+use crate::discord::state::DiscordState;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VoiceParticipantState {
@@ -34,7 +34,7 @@ pub struct CurrentVoiceConnectionState {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct VoiceState {
+pub(in crate::discord) struct VoiceState {
     channel_id: Id<ChannelMarker>,
     user_id: Id<UserMarker>,
     deaf: bool,
@@ -190,7 +190,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn update_voice_state(&mut self, state: &VoiceStateInfo) {
+    pub(in crate::discord) fn update_voice_state(&mut self, state: &VoiceStateInfo) {
         let key = (state.guild_id, state.user_id);
         let current_user_previous_channel = if self.session.current_user_id == Some(state.user_id) {
             self.voice
@@ -229,7 +229,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn update_voice_speaking(
+    pub(in crate::discord) fn update_voice_speaking(
         &mut self,
         guild_id: Id<GuildMarker>,
         channel_id: Id<ChannelMarker>,
@@ -244,7 +244,7 @@ impl DiscordState {
         }
     }
 
-    pub(super) fn remove_voice_state(
+    pub(in crate::discord) fn remove_voice_state(
         &mut self,
         guild_id: Id<GuildMarker>,
         user_id: Id<UserMarker>,
@@ -252,13 +252,16 @@ impl DiscordState {
         self.voice.states.remove(&(guild_id, user_id));
     }
 
-    pub(super) fn remove_voice_states_for_guild(&mut self, guild_id: Id<GuildMarker>) {
+    pub(in crate::discord) fn remove_voice_states_for_guild(&mut self, guild_id: Id<GuildMarker>) {
         self.voice
             .states
             .retain(|(state_guild_id, _), _| *state_guild_id != guild_id);
     }
 
-    pub(super) fn remove_voice_states_for_channel(&mut self, channel_id: Id<ChannelMarker>) {
+    pub(in crate::discord) fn remove_voice_states_for_channel(
+        &mut self,
+        channel_id: Id<ChannelMarker>,
+    ) {
         self.voice
             .states
             .retain(|_, state| state.channel_id != channel_id);

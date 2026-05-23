@@ -5,7 +5,7 @@ use crate::discord::ids::{
     marker::{ChannelMarker, GuildMarker, UserMarker},
 };
 
-use super::MemberInfo;
+use crate::discord::MemberInfo;
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct VoiceStateInfo {

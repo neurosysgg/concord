@@ -11,7 +11,7 @@ use crate::discord::{
     NotificationLevel,
 };
 
-use super::{DiscordState, MessageState};
+use crate::discord::{MessageState, state::DiscordState};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ChannelUnreadState {
@@ -22,7 +22,7 @@ pub enum ChannelUnreadState {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum MessageNotificationKind {
+pub(in crate::discord) enum MessageNotificationKind {
     None,
     Mention,
     Notify,
@@ -36,7 +36,7 @@ struct ChannelNotificationSettingsState {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct GuildNotificationSettingsState {
+pub(in crate::discord) struct GuildNotificationSettingsState {
     message_notifications: Option<NotificationLevel>,
     muted: bool,
     mute_end_time: Option<String>,
@@ -229,7 +229,7 @@ impl DiscordState {
         ) != MessageNotificationKind::None
     }
 
-    pub(super) fn upsert_notification_settings(
+    pub(in crate::discord) fn upsert_notification_settings(
         &mut self,
         settings: &GuildNotificationSettingsInfo,
     ) {
@@ -261,7 +261,7 @@ impl DiscordState {
         )
     }
 
-    pub(super) fn message_create_notification_kind(
+    pub(in crate::discord) fn message_create_notification_kind(
         &self,
         guild_id: Option<Id<GuildMarker>>,
         channel_id: Id<ChannelMarker>,
