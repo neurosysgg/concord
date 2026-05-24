@@ -432,7 +432,13 @@ Example `keymap.toml`:
 ```toml
 [keymap]
 StartComposer = { keys = ["c"] }
-ReplyMessage = "<leader>m r"
+ReplyMessage = "<leader>mr"
+VoiceDeafen = "<leader>vd"
+VoiceMute = "<leader>vm"
+VoiceLeave = "<leader>vl"
+
+[keymap.groups]
+"<leader>v" = "Voice"
 
 [keymap.channel_actions]
 MuteChannel = { keys = ["x"], description = "mute channel" }
@@ -537,9 +543,9 @@ sequence if you want direct keys for them.
 | `OpenDisplayOptions`      | Contextual `d` after `OpenOptions` | Open Display options.                        |
 | `OpenNotificationOptions` | Contextual `n` after `OpenOptions` | Open Notification options.                   |
 | `OpenVoiceOptions`        | Contextual `v` after `OpenOptions` | Open Voice options.                          |
-| `VoiceDeafen`             | `"<leader>v d"`                    | Toggle voice deafen.                         |
-| `VoiceMute`               | `"<leader>v m"`                    | Toggle voice mute.                           |
-| `VoiceLeave`              | `"<leader>v l"`                    | Leave the current Concord voice channel.     |
+| `VoiceDeafen`             | `"<leader>vd"`                     | Toggle voice deafen.                         |
+| `VoiceMute`               | `"<leader>vm"`                     | Toggle voice mute.                           |
+| `VoiceLeave`              | `"<leader>vl"`                     | Leave the current Concord voice channel.     |
 
 ##### Composer actions
 
@@ -630,8 +636,8 @@ ShowReactionUsers = "u"
 OpenPollVotePicker = "c"
 ```
 
-| Action label         | Default shortcut | When it appears                                     |
-| -------------------- | ---------------- | --------------------------------------------------- |
+| Action label         | Default shortcut | When it appears                                      |
+| -------------------- | ---------------- | ---------------------------------------------------- |
 | `Open thread`        | `t`              | The selected message has a thread. Otherwise dimmed. |
 | `Show reacted users` | `u`              | Reaction users can be shown. Otherwise dimmed.       |
 | `Choose poll votes`  | `c`              | A non-finalized poll is selected. Otherwise dimmed.  |
@@ -679,9 +685,9 @@ ToggleMemberPane = "<leader>4"
 OpenFocusedPaneAction = "<leader>a"
 OpenOptions = "<leader>o"
 ChannelSwitcher = "<leader><leader>"
-VoiceDeafen = "<leader>v d"
-VoiceMute = "<leader>v m"
-VoiceLeave = "<leader>v l"
+VoiceDeafen = "<leader>vd"
+VoiceMute = "<leader>vm"
+VoiceLeave = "<leader>vl"
 
 [keymap.groups]
 "<leader>v" = "Voice"
