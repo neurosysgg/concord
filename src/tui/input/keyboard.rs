@@ -5,8 +5,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crate::discord::MessageAttachmentUpload;
 use crate::tui::keybindings::{
     ChannelSwitcherAction, ComposerAction, ComposerCompletionAction, DashboardAction,
-    DebugLogPopupAction, EmojiReactionPickerAction, GlobalAction, ImageViewerAction, KeyMapLookup,
-    LeaderActionMenuAction, MessageConfirmationAction, MessageShortcutAction,
+    DebugLogPopupAction, EmojiReactionPickerAction, GlobalAction, ImageViewerAction, KeyChord,
+    KeyMapLookup, LeaderActionMenuAction, MessageConfirmationAction, MessageShortcutAction,
     OptionsCategoryShortcut, OptionsPopupAction, PaneFilterAction, PollVotePickerAction,
     PopupListAction, ProfilePopupAction, ReactionUsersPopupAction, ScrollAction, SelectionAction,
     UiAction,
@@ -417,7 +417,7 @@ fn handle_leader_action_key(state: &mut DashboardState, key: KeyEvent) -> Option
 
 fn activate_leader_action_shortcut(
     state: &mut DashboardState,
-    shortcut: char,
+    shortcut: KeyChord,
 ) -> (bool, Option<AppCommand>) {
     if leader_message_action_matches(state, shortcut) {
         return (true, state.activate_message_action_shortcut(shortcut));
@@ -434,18 +434,18 @@ fn activate_leader_action_shortcut(
     (false, None)
 }
 
-fn leader_message_action_matches(state: &DashboardState, shortcut: char) -> bool {
+fn leader_message_action_matches(state: &DashboardState, shortcut: KeyChord) -> bool {
     if !state.is_message_action_menu_open() {
         return false;
     }
     let actions = state.selected_message_action_items();
-    actions.iter().enumerate().any(|(index, action)| {
-        action.enabled
-            && state
-                .key_bindings()
-                .message_action_shortcuts(&actions, index)
-                .contains(&shortcut)
-    })
+    action_shortcut_matches(
+        state,
+        &actions,
+        shortcut,
+        |key_bindings, actions, index| key_bindings.message_action_shortcuts(actions, index),
+        |action| action.enabled,
+    )
 }
 
 fn handle_message_url_picker_key(state: &mut DashboardState, key: KeyEvent) -> Option<AppCommand> {
@@ -469,66 +469,88 @@ fn handle_message_url_picker_key(state: &mut DashboardState, key: KeyEvent) -> O
     None
 }
 
-fn leader_channel_action_matches(state: &DashboardState, shortcut: char) -> bool {
+fn leader_channel_action_matches(state: &DashboardState, shortcut: KeyChord) -> bool {
     if !state.is_channel_leader_action_active() {
         return false;
     }
     if state.is_channel_action_threads_phase() {
-        return state
-            .channel_action_thread_items()
-            .iter()
-            .enumerate()
-            .any(|(index, _)| state.key_bindings().indexed_shortcut(index) == Some(shortcut));
+        return indexed_shortcut_matches(
+            state,
+            shortcut,
+            state.channel_action_thread_items().len(),
+        );
     }
     if state.is_channel_action_mute_duration_phase() {
-        return state
-            .selected_channel_mute_duration_items()
-            .iter()
-            .enumerate()
-            .any(|(index, _)| state.key_bindings().indexed_shortcut(index) == Some(shortcut));
+        return indexed_shortcut_matches(
+            state,
+            shortcut,
+            state.selected_channel_mute_duration_items().len(),
+        );
     }
     let actions = state.selected_channel_action_items();
-    actions.iter().enumerate().any(|(index, action)| {
-        action.enabled
-            && state
-                .key_bindings()
-                .channel_action_shortcuts(&actions, index)
-                .contains(&shortcut)
-    })
+    action_shortcut_matches(
+        state,
+        &actions,
+        shortcut,
+        |key_bindings, actions, index| key_bindings.channel_action_shortcuts(actions, index),
+        |action| action.enabled,
+    )
 }
 
-fn leader_guild_action_matches(state: &DashboardState, shortcut: char) -> bool {
+fn leader_guild_action_matches(state: &DashboardState, shortcut: KeyChord) -> bool {
     if !state.is_guild_leader_action_active() {
         return false;
     }
     if state.is_guild_action_mute_duration_phase() {
-        return state
-            .selected_guild_mute_duration_items()
-            .iter()
-            .enumerate()
-            .any(|(index, _)| state.key_bindings().indexed_shortcut(index) == Some(shortcut));
+        return indexed_shortcut_matches(
+            state,
+            shortcut,
+            state.selected_guild_mute_duration_items().len(),
+        );
     }
     let actions = state.selected_guild_action_items();
-    actions.iter().enumerate().any(|(index, action)| {
-        action.enabled
-            && state
-                .key_bindings()
-                .guild_action_shortcuts(&actions, index)
-                .contains(&shortcut)
-    })
+    action_shortcut_matches(
+        state,
+        &actions,
+        shortcut,
+        |key_bindings, actions, index| key_bindings.guild_action_shortcuts(actions, index),
+        |action| action.enabled,
+    )
 }
 
-fn leader_member_action_matches(state: &DashboardState, shortcut: char) -> bool {
+fn leader_member_action_matches(state: &DashboardState, shortcut: KeyChord) -> bool {
     if !state.is_member_leader_action_active() {
         return false;
     }
     let actions = state.selected_member_action_items();
-    actions.iter().enumerate().any(|(index, action)| {
-        action.enabled
-            && state
-                .key_bindings()
-                .member_action_shortcuts(&actions, index)
-                .contains(&shortcut)
+    action_shortcut_matches(
+        state,
+        &actions,
+        shortcut,
+        |key_bindings, actions, index| key_bindings.member_action_shortcuts(actions, index),
+        |action| action.enabled,
+    )
+}
+
+fn action_shortcut_matches<A>(
+    state: &DashboardState,
+    actions: &[A],
+    shortcut: KeyChord,
+    shortcuts: impl Fn(&crate::tui::keybindings::KeyBindings, &[A], usize) -> Vec<KeyChord>,
+    is_enabled: impl Fn(&A) -> bool,
+) -> bool {
+    state
+        .key_bindings()
+        .matching_action_shortcut_index(actions, shortcut, shortcuts, is_enabled)
+        .is_some()
+}
+
+fn indexed_shortcut_matches(state: &DashboardState, shortcut: KeyChord, len: usize) -> bool {
+    (0..len).any(|index| {
+        state
+            .key_bindings()
+            .indexed_shortcut(index)
+            .is_some_and(|candidate| shortcut.matches_char(candidate))
     })
 }
 

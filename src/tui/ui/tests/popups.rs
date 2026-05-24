@@ -1025,6 +1025,65 @@ fn leader_action_popup_renders_focused_pane_actions() {
 }
 
 #[test]
+fn leader_action_popup_renders_modified_action_shortcut_labels() {
+    let guild_id = Id::new(1);
+    let channel_id = Id::new(2);
+    let mut channel_actions = BTreeMap::new();
+    channel_actions.insert(
+        "MuteChannel".to_owned(),
+        crate::config::KeymapBinding::one("<C-u>"),
+    );
+    let mut state = DashboardState::new_with_options(
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        crate::config::KeymapOptions {
+            channel_actions,
+            ..Default::default()
+        },
+        Default::default(),
+    );
+    state.push_event(AppEvent::GuildCreate {
+        guild_id,
+        name: "guild".to_owned(),
+        member_count: None,
+        channels: vec![ChannelInfo {
+            guild_id: Some(guild_id),
+            channel_id,
+            parent_id: None,
+            owner_id: None,
+            position: None,
+            last_message_id: None,
+            name: "general".to_owned(),
+            kind: "GuildText".to_owned(),
+            message_count: None,
+            member_count: None,
+            total_message_sent: None,
+            thread_metadata: None,
+            flags: None,
+            recipients: None,
+            permission_overwrites: Vec::new(),
+        }],
+        members: Vec::new(),
+        presences: Vec::new(),
+        roles: Vec::new(),
+        emojis: Vec::new(),
+        owner_id: None,
+    });
+    state.confirm_selected_guild();
+    state.confirm_selected_channel();
+    state.focus_pane(FocusPane::Channels);
+    state.open_leader();
+    state.open_leader_actions_for_focused_target();
+
+    let lines = leader_action_lines_for_test(&state);
+    let rendered = line_texts_from_ratatui(&lines).join("\n");
+
+    assert!(rendered.contains("[Ctrl+u]"), "{rendered}");
+    assert!(rendered.contains("Mute channel"), "{rendered}");
+}
+
+#[test]
 fn leader_action_popup_dims_disabled_channel_actions() {
     let mut state = state_with_message();
     state.focus_pane(FocusPane::Channels);

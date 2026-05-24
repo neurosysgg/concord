@@ -1,4 +1,5 @@
 use super::*;
+use crate::tui::keybindings::KeyChord;
 
 const LEADER_POPUP_MIN_WIDTH: u16 = 74;
 const LEADER_POPUP_ROWS: usize = 4;
@@ -130,19 +131,21 @@ fn leader_line_width(line: &Line<'_>) -> usize {
 fn leader_action_lines(state: &DashboardState) -> Vec<Line<'static>> {
     if state.is_message_action_menu_open() {
         let actions = state.selected_message_action_items();
-        return actions
-            .iter()
-            .enumerate()
-            .map(|(index, action)| {
-                leader_shortcut_keys_line(
-                    &state
-                        .key_bindings()
-                        .message_action_shortcuts(&actions, index),
-                    &state.key_bindings().message_action_label(action),
-                    action.enabled,
-                )
-            })
-            .collect();
+        return leader_action_key_lines(
+            actions
+                .iter()
+                .enumerate()
+                .map(|(index, action)| {
+                    (
+                        state
+                            .key_bindings()
+                            .message_action_shortcuts(&actions, index),
+                        state.key_bindings().message_action_label(action),
+                        action.enabled,
+                    )
+                })
+                .collect(),
+        );
     }
     if state.is_guild_leader_action_active() {
         if state.is_guild_action_mute_duration_phase() {
@@ -160,17 +163,19 @@ fn leader_action_lines(state: &DashboardState) -> Vec<Line<'static>> {
                 .collect();
         }
         let actions = state.selected_guild_action_items();
-        return actions
-            .iter()
-            .enumerate()
-            .map(|(index, action)| {
-                leader_shortcut_keys_line(
-                    &state.key_bindings().guild_action_shortcuts(&actions, index),
-                    &state.key_bindings().guild_action_label(action),
-                    action.enabled,
-                )
-            })
-            .collect();
+        return leader_action_key_lines(
+            actions
+                .iter()
+                .enumerate()
+                .map(|(index, action)| {
+                    (
+                        state.key_bindings().guild_action_shortcuts(&actions, index),
+                        state.key_bindings().guild_action_label(action),
+                        action.enabled,
+                    )
+                })
+                .collect(),
+        );
     }
     if state.is_channel_action_threads_phase() {
         return state
@@ -202,35 +207,39 @@ fn leader_action_lines(state: &DashboardState) -> Vec<Line<'static>> {
                 .collect();
         }
         let actions = state.selected_channel_action_items();
-        return actions
-            .iter()
-            .enumerate()
-            .map(|(index, action)| {
-                leader_shortcut_keys_line(
-                    &state
-                        .key_bindings()
-                        .channel_action_shortcuts(&actions, index),
-                    &state.key_bindings().channel_action_label(action),
-                    action.enabled,
-                )
-            })
-            .collect();
+        return leader_action_key_lines(
+            actions
+                .iter()
+                .enumerate()
+                .map(|(index, action)| {
+                    (
+                        state
+                            .key_bindings()
+                            .channel_action_shortcuts(&actions, index),
+                        state.key_bindings().channel_action_label(action),
+                        action.enabled,
+                    )
+                })
+                .collect(),
+        );
     }
     if state.is_member_leader_action_active() {
         let actions = state.selected_member_action_items();
-        return actions
-            .iter()
-            .enumerate()
-            .map(|(index, action)| {
-                leader_shortcut_keys_line(
-                    &state
-                        .key_bindings()
-                        .member_action_shortcuts(&actions, index),
-                    &state.key_bindings().member_action_label(action),
-                    action.enabled,
-                )
-            })
-            .collect();
+        return leader_action_key_lines(
+            actions
+                .iter()
+                .enumerate()
+                .map(|(index, action)| {
+                    (
+                        state
+                            .key_bindings()
+                            .member_action_shortcuts(&actions, index),
+                        state.key_bindings().member_action_label(action),
+                        action.enabled,
+                    )
+                })
+                .collect(),
+        );
     }
     vec![Line::from(Span::styled(
         "No actions available",
@@ -249,26 +258,51 @@ fn leader_shortcut_line(key: char, label: &str, enabled: bool) -> Line<'static> 
     leader_shortcut_text_line(&key.to_string(), label, enabled)
 }
 
-fn leader_shortcut_keys_line(keys: &[char], label: &str, enabled: bool) -> Line<'static> {
-    let key_label = if keys.is_empty() {
+// Action shortcuts can carry modifiers, so key labels vary in width (`[t]` vs
+// `[Ctrl+u]`). Pad every prefix to the widest one so the label column stays
+// aligned across rows.
+fn leader_action_key_lines(rows: Vec<(Vec<KeyChord>, String, bool)>) -> Vec<Line<'static>> {
+    let prefixes: Vec<String> = rows
+        .iter()
+        .map(|(keys, _, _)| format!("[{}]", leader_shortcut_key_label(keys)))
+        .collect();
+    let width = prefixes
+        .iter()
+        .map(|prefix| prefix.width())
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1);
+    rows.into_iter()
+        .zip(prefixes)
+        .map(|((_, label, enabled), prefix)| {
+            leader_shortcut_prefix_line(&format!("{prefix:<width$}"), &label, enabled)
+        })
+        .collect()
+}
+
+fn leader_shortcut_key_label(keys: &[KeyChord]) -> String {
+    if keys.is_empty() {
         " ".to_owned()
     } else {
         keys.iter()
-            .map(char::to_string)
+            .map(|key| key.label())
             .collect::<Vec<_>>()
             .join("/")
-    };
-    leader_shortcut_text_line(&key_label, label, enabled)
+    }
 }
 
 fn leader_shortcut_text_line(key: &str, label: &str, enabled: bool) -> Line<'static> {
+    leader_shortcut_prefix_line(&format!("[{key}] "), label, enabled)
+}
+
+fn leader_shortcut_prefix_line(prefix: &str, label: &str, enabled: bool) -> Line<'static> {
     let style = if enabled {
         Style::default()
     } else {
         Style::default().fg(DIM)
     };
     Line::from(vec![
-        Span::styled(format!("[{key}] "), Style::default().fg(DIM)),
+        Span::styled(prefix.to_owned(), Style::default().fg(DIM)),
         Span::raw(" "),
         Span::styled(label.to_owned(), style),
     ])
@@ -325,13 +359,20 @@ fn message_action_menu_lines_with_key_bindings(
     selected: usize,
     key_bindings: &crate::tui::keybindings::KeyBindings,
 ) -> Vec<Line<'static>> {
+    let prefixes: Vec<String> = (0..actions.len())
+        .map(|index| shortcut_keys_prefix(&key_bindings.message_action_shortcuts(actions, index)))
+        .collect();
+    let prefix_width = prefixes
+        .iter()
+        .map(|prefix| prefix.width())
+        .max()
+        .unwrap_or(0);
     actions
         .iter()
         .enumerate()
         .map(|(index, action)| {
             let marker = if index == selected { "› " } else { "  " };
-            let shortcut =
-                shortcut_keys_prefix(&key_bindings.message_action_shortcuts(actions, index));
+            let shortcut = format!("{:<prefix_width$}", prefixes[index]);
             let label = if action.enabled {
                 key_bindings.message_action_label(action)
             } else {
@@ -359,7 +400,7 @@ fn message_action_menu_lines_with_key_bindings(
         .collect()
 }
 
-fn shortcut_keys_prefix(shortcuts: &[char]) -> String {
+fn shortcut_keys_prefix(shortcuts: &[KeyChord]) -> String {
     if shortcuts.is_empty() {
         return "    ".to_owned();
     }
@@ -367,7 +408,7 @@ fn shortcut_keys_prefix(shortcuts: &[char]) -> String {
         "[{}] ",
         shortcuts
             .iter()
-            .map(char::to_string)
+            .map(|key| key.label())
             .collect::<Vec<_>>()
             .join("/")
     )

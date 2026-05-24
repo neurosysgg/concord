@@ -255,17 +255,17 @@ shortcuts:
 
 Message shortcuts:
 
-| Shortcut | Action      | Description                                                 |
-| -------- | ----------- | ----------------------------------------------------------- |
-| `y`      | Copy        | Copy the selected message text and show a short toast       |
+| Shortcut | Action              | Description                                                 |
+| -------- | ------------------- | ----------------------------------------------------------- |
+| `y`      | Copy                | Copy the selected message text and show a short toast       |
 | `r`      | Add/remove reaction | Open the reaction picker for the selected message           |
-| `R`      | Reply       | Start a reply to the selected message                       |
-| `d`      | Delete      | Open a delete confirmation before deleting the message      |
-| `e`      | Edit        | Start editing the selected message when editing is allowed  |
-| `o`      | Open URL    | Open the selected message URL, or choose from multiple URLs |
-| `v`      | View image  | Open the selected message's image viewer                    |
-| `p`      | Profile     | Open the selected message author's profile                  |
-| `P`      | Pin / unpin | Open a pin or unpin confirmation for the selected message   |
+| `R`      | Reply               | Start a reply to the selected message                       |
+| `d`      | Delete              | Open a delete confirmation before deleting the message      |
+| `e`      | Edit                | Start editing the selected message when editing is allowed  |
+| `o`      | Open URL            | Open the selected message URL, or choose from multiple URLs |
+| `v`      | View image          | Open the selected message's image viewer                    |
+| `p`      | Profile             | Open the selected message author's profile                  |
+| `P`      | Pin / unpin         | Open a pin or unpin confirmation for the selected message   |
 
 If a message contains more than one detected URL, `o` opens a numbered URL picker inside the leader popup so you can choose which link to open.
 
@@ -441,19 +441,19 @@ MuteChannel = { keys = ["x"], description = "mute channel" }
 OpenThread = { keys = ["t"], description = "open thread" }
 
 [keymap.composer]
-OpenEditor = "ctrl+o"
-DeletePreviousWord = "alt+backspace"
+OpenEditor = "<C-o>"
+DeletePreviousWord = "<A-backspace>"
 ```
 
 There are five kinds of keymap settings:
 
-| Config path                                                                     | What it controls                                                                            |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `[keymap] leader`                                                               | The key that opens the leader popup. Defaults to `Space`.                                   |
-| `[keymap] <ActionName>`                                                         | Directly assignable UI actions such as `StartComposer`, `ChannelSwitcher`, and `VoiceMute`. |
-| `[keymap.groups]`                                                               | Optional titles for prefix popups, such as naming `<leader>v` as `Voice`.                   |
+| Config path                                                                                                 | What it controls                                                                            |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `[keymap] leader`                                                                                           | The key that opens the leader popup. Defaults to `Space`.                                   |
+| `[keymap] <ActionName>`                                                                                     | Directly assignable UI actions such as `StartComposer`, `ChannelSwitcher`, and `VoiceMute`. |
+| `[keymap.groups]`                                                                                           | Optional titles for prefix popups, such as naming `<leader>v` as `Voice`.                   |
 | `[keymap.guild_actions]`, `[keymap.channel_actions]`, `[keymap.member_actions]`, `[keymap.message_actions]` | Shortcuts shown inside focused-pane action menus opened by `OpenFocusedPaneAction`.         |
-| `[keymap.composer]`                                                             | Shortcuts used while the message composer is open, such as editor and cursor commands.      |
+| `[keymap.composer]`                                                                                         | Shortcuts used while the message composer is open, such as editor and cursor commands.      |
 
 `[keymap]` action values can be either a string or an object with `keys` and an
 optional `description`:
@@ -464,19 +464,16 @@ StartComposer = "<leader>e"
 ChannelSwitcher = { keys = ["<C-w>f", "<leader><C-w>"], description = "find channel" }
 ```
 
-`keys` accepts one sequence or a list of sequences. Direct keys like `<C-f>`,
-leader sequences like `<leader><C-w>`, compact plain sequences like `fd`, and
+`keys` accepts one sequence or a list of sequences. Modifier chords use
+Vim-style angle syntax, such as `<C-f>`, `<S-tab>`, and `<A-backspace>`.
+Leader sequences like `<leader><C-w>`, compact plain sequences like `fd`, and
 general multi-key prefixes like `<C-w>f` are supported. Prefix sequences show a
-which-key style popup. For example, `fd` opens an `f` popup after `f`, then runs
+[which-key.nvim](https://github.com/folke/which-key.nvim) style popup. For example, `fd` opens an `f` popup after `f`, then runs
 the action after `d`.
-
-Scoped pane action values use the same string or object shape, but each `keys`
-entry must be a single character key because aliases are shown inside the action
-menu:
 
 ```toml
 [keymap.channel_actions]
-MuteChannel = { keys = ["x", "u"], description = "mute channel" }
+MuteChannel = { keys = ["u", "<C-u>"], description = "mute channel" }
 ```
 
 Composer action values under `[keymap.composer]` use the same string or object
@@ -485,8 +482,8 @@ immediately while text is being typed:
 
 ```toml
 [keymap.composer]
-OpenEditor = { keys = ["ctrl+o"], description = "open editor" }
-DeletePreviousWord = "alt+backspace"
+OpenEditor = { keys = ["<C-o>"], description = "open editor" }
+DeletePreviousWord = "<A-backspace>"
 ```
 
 For directly assignable `[keymap]` actions, reserved keys cannot be configured.
@@ -514,9 +511,9 @@ sequence if you want direct keys for them.
 | `FocusMessagePane`        | `"3"`                              | Focus the Messages pane.                     |
 | `FocusMemberPane`         | `"4"`                              | Show and focus the Members pane.             |
 | `CycleFocusNext`          | `["tab", "l", "right"]`            | Cycle focus forward.                         |
-| `CycleFocusPrevious`      | `["shift+tab", "h", "left"]`       | Cycle focus backward.                        |
-| `HalfPageDown`            | `"ctrl+d"`                         | Half-page down.                              |
-| `HalfPageUp`              | `"ctrl+u"`                         | Half-page up.                                |
+| `CycleFocusPrevious`      | `["<S-tab>", "h", "left"]`         | Cycle focus backward.                        |
+| `HalfPageDown`            | `"<C-d>"`                          | Half-page down.                              |
+| `HalfPageUp`              | `"<C-u>"`                          | Half-page up.                                |
 | `JumpTop`                 | `"g"`                              | Jump to the top.                             |
 | `JumpBottom`              | `"G"`                              | Jump to the bottom.                          |
 | `ScrollHorizontalLeft`    | `"H"`                              | Scroll focused pane horizontally left.       |
@@ -549,25 +546,25 @@ These action names can be assigned under `[keymap.composer]`. Configured keys
 replace that action's defaults. Any printable single character can be configured,
 but that key will run the composer action instead of inserting text.
 
-| Composer action        | Default config                                  | Action                                  |
-| ---------------------- | ----------------------------------------------- | --------------------------------------- |
-| `OpenEditor`           | `"ctrl+e"`                                     | Open the current draft in `$EDITOR`.    |
-| `PasteClipboard`       | `"ctrl+v"`                                     | Request clipboard paste.                |
-| `InsertNewline`        | `["shift+enter", "ctrl+enter", "alt+enter"]` | Insert a newline.                       |
-| `Submit`               | `"enter"`                                      | Submit the composer.                    |
-| `Close`                | `"esc"`                                        | Close the composer.                     |
-| `ClearInput`           | `"ctrl+c"`                                     | Clear the composer input.               |
-| `RemoveLastAttachment` | `"delete"`                                     | Remove the last pending attachment.     |
-| `DeletePreviousChar`   | `"backspace"`                                  | Delete the previous character.          |
-| `DeletePreviousWord`   | `["ctrl+backspace", "ctrl+w"]`               | Delete the word before the cursor.      |
-| `MoveCursorUp`         | `"up"`                                         | Move the cursor up.                     |
-| `MoveCursorDown`       | `"down"`                                       | Move the cursor down.                   |
-| `MoveCursorWordLeft`   | `"ctrl+left"`                                  | Move the cursor one word left.          |
-| `MoveCursorLeft`       | `"left"`                                       | Move the cursor left.                   |
-| `MoveCursorWordRight`  | `"ctrl+right"`                                 | Move the cursor one word right.         |
-| `MoveCursorRight`      | `"right"`                                      | Move the cursor right.                  |
-| `MoveCursorHome`       | `"home"`                                       | Move the cursor to the start.           |
-| `MoveCursorEnd`        | `"end"`                                        | Move the cursor to the end.             |
+| Composer action        | Default config                            | Action                               |
+| ---------------------- | ----------------------------------------- | ------------------------------------ |
+| `OpenEditor`           | `"<C-e>"`                                 | Open the current draft in `$EDITOR`. |
+| `PasteClipboard`       | `"<C-v>"`                                 | Request clipboard paste.             |
+| `InsertNewline`        | `["<S-enter>", "<C-enter>", "<A-enter>"]` | Insert a newline.                    |
+| `Submit`               | `"enter"`                                 | Submit the composer.                 |
+| `Close`                | `"esc"`                                   | Close the composer.                  |
+| `ClearInput`           | `"<C-c>"`                                 | Clear the composer input.            |
+| `RemoveLastAttachment` | `"delete"`                                | Remove the last pending attachment.  |
+| `DeletePreviousChar`   | `"backspace"`                             | Delete the previous character.       |
+| `DeletePreviousWord`   | `["<C-backspace>", "<C-w>"]`              | Delete the word before the cursor.   |
+| `MoveCursorUp`         | `"up"`                                    | Move the cursor up.                  |
+| `MoveCursorDown`       | `"down"`                                  | Move the cursor down.                |
+| `MoveCursorWordLeft`   | `"<C-left>"`                              | Move the cursor one word left.       |
+| `MoveCursorLeft`       | `"left"`                                  | Move the cursor left.                |
+| `MoveCursorWordRight`  | `"<C-right>"`                             | Move the cursor one word right.      |
+| `MoveCursorRight`      | `"right"`                                 | Move the cursor right.               |
+| `MoveCursorHome`       | `"home"`                                  | Move the cursor to the start.        |
+| `MoveCursorEnd`        | `"end"`                                   | Move the cursor to the end.          |
 
 ##### Focused pane actions
 
@@ -633,12 +630,12 @@ ShowReactionUsers = "u"
 OpenPollVotePicker = "c"
 ```
 
-| Action label                    | Default shortcut | When it appears                                               |
-| ------------------------------- | ---------------- | ------------------------------------------------------------- |
-| `Open thread`                   | `t`              | The selected message has a thread. Otherwise dimmed.          |
-| `Download {filename}`           | `f`              | The selected message has a downloadable non-image attachment. Otherwise dimmed. |
-| `Show reacted users`            | `u`              | Reaction users can be shown. Otherwise dimmed.                |
-| `Choose poll votes`             | `c`              | A non-finalized poll is selected. Otherwise dimmed.           |
+| Action label          | Default shortcut | When it appears                                                                 |
+| --------------------- | ---------------- | ------------------------------------------------------------------------------- |
+| `Open thread`         | `t`              | The selected message has a thread. Otherwise dimmed.                            |
+| `Download {filename}` | `f`              | The selected message has a downloadable non-image attachment. Otherwise dimmed. |
+| `Show reacted users`  | `u`              | Reaction users can be shown. Otherwise dimmed.                                  |
+| `Choose poll votes`   | `c`              | A non-finalized poll is selected. Otherwise dimmed.                             |
 
 Scoped action `description` changes the label shown in the action menu. Multiple
 configured `keys` work as aliases when they are unique in the current action
@@ -660,9 +657,9 @@ FocusChannelPane = "2"
 FocusMessagePane = "3"
 FocusMemberPane = "4"
 CycleFocusNext = { keys = ["tab", "l", "right"] }
-CycleFocusPrevious = { keys = ["shift+tab", "h", "left"] }
-HalfPageDown = "ctrl+d"
-HalfPageUp = "ctrl+u"
+CycleFocusPrevious = { keys = ["<S-tab>", "h", "left"] }
+HalfPageDown = "<C-d>"
+HalfPageUp = "<C-u>"
 JumpTop = "g"
 JumpBottom = "G"
 ScrollHorizontalLeft = "H"
@@ -711,20 +708,20 @@ ShowReactionUsers = "u"
 OpenPollVotePicker = "c"
 
 [keymap.composer]
-OpenEditor = "ctrl+e"
-PasteClipboard = "ctrl+v"
-InsertNewline = { keys = ["shift+enter", "ctrl+enter", "alt+enter"] }
+OpenEditor = "<C-e>"
+PasteClipboard = "<C-v>"
+InsertNewline = { keys = ["<S-enter>", "<C-enter>", "<A-enter>"] }
 Submit = "enter"
 Close = "esc"
-ClearInput = "ctrl+c"
+ClearInput = "<C-c>"
 RemoveLastAttachment = "delete"
 DeletePreviousChar = "backspace"
-DeletePreviousWord = { keys = ["ctrl+backspace", "ctrl+w"] }
+DeletePreviousWord = { keys = ["<C-backspace>", "<C-w>"] }
 MoveCursorUp = "up"
 MoveCursorDown = "down"
-MoveCursorWordLeft = "ctrl+left"
+MoveCursorWordLeft = "<C-left>"
 MoveCursorLeft = "left"
-MoveCursorWordRight = "ctrl+right"
+MoveCursorWordRight = "<C-right>"
 MoveCursorRight = "right"
 MoveCursorHome = "home"
 MoveCursorEnd = "end"

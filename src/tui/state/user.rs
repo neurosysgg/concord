@@ -14,6 +14,7 @@ use crate::discord::ids::{
 use crate::discord::{
     ActivityInfo, ChannelInfo, MessageInfo, MessageState, PresenceStatus, UserProfileInfo,
 };
+use crate::tui::keybindings::KeyChord;
 
 use super::{ActiveGuildScope, DashboardState};
 use super::{
@@ -128,16 +129,14 @@ impl DashboardState {
         }
     }
 
-    pub fn activate_member_action_shortcut(&mut self, shortcut: char) -> Option<AppCommand> {
+    pub fn activate_member_action_shortcut(&mut self, shortcut: KeyChord) -> Option<AppCommand> {
         let actions = self.selected_member_action_items();
-        let index = actions.iter().enumerate().position(|(index, action)| {
-            action.enabled
-                && self
-                    .options
-                    .key_bindings()
-                    .member_action_shortcuts(&actions, index)
-                    .contains(&shortcut)
-        })?;
+        let index = self.options.key_bindings().matching_action_shortcut_index(
+            &actions,
+            shortcut,
+            |key_bindings, actions, index| key_bindings.member_action_shortcuts(actions, index),
+            |action| action.enabled,
+        )?;
         self.select_member_action_row(index);
         self.activate_selected_member_action()
     }

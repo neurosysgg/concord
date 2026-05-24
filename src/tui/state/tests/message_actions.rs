@@ -526,7 +526,10 @@ fn direct_message_url_opens_url_picker_for_multiple_urls() {
     assert_eq!(state.selected_message_url_index(), Some(0));
 
     assert_eq!(
-        state.activate_message_url_shortcut('2'),
+        state.activate_message_url_shortcut(
+            "2".parse::<crate::tui::keybindings::KeyChord>()
+                .expect("2 should parse"),
+        ),
         Some(AppCommand::OpenUrl {
             url: "https://two.example/path".to_owned(),
         })

@@ -26,7 +26,7 @@ fn channel_leader_action_lists_threads_for_selected_channel() {
     assert_eq!(actions[5].kind, ChannelActionKind::ToggleMute);
     assert_eq!(actions[5].label, "Mute channel");
 
-    let command = state.activate_channel_action_shortcut('t');
+    let command = state.activate_channel_action_shortcut("t".parse().expect("t should parse"));
     assert_eq!(command, None);
     assert!(state.is_channel_action_threads_phase());
 
@@ -86,7 +86,7 @@ fn channel_leader_action_open_thread_activates_and_subscribes() {
     let mut state = state_with_thread_created_message();
     state.focus_pane(FocusPane::Channels);
     state.open_selected_channel_actions();
-    state.activate_channel_action_shortcut('t');
+    state.activate_channel_action_shortcut("t".parse().expect("t should parse"));
     let command = state.activate_selected_channel_action();
 
     assert_eq!(state.selected_channel_id(), Some(Id::new(10)));

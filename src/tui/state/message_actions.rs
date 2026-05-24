@@ -1,5 +1,6 @@
 use crate::discord::{EmbedInfo, MessageState, ReactionEmoji};
 use crate::tui::format::detected_urls;
+use crate::tui::keybindings::KeyChord;
 
 use super::scroll::{clamp_selected_index, move_index_down, move_index_up};
 use super::{
@@ -299,16 +300,14 @@ impl DashboardState {
         self.discord.cache.can_pin_messages_in_channel(channel)
     }
 
-    pub fn activate_message_action_shortcut(&mut self, shortcut: char) -> Option<AppCommand> {
+    pub fn activate_message_action_shortcut(&mut self, shortcut: KeyChord) -> Option<AppCommand> {
         let actions = self.selected_message_action_items();
-        let index = actions.iter().enumerate().position(|(index, action)| {
-            action.enabled
-                && self
-                    .options
-                    .key_bindings()
-                    .message_action_shortcuts(&actions, index)
-                    .contains(&shortcut)
-        })?;
+        let index = self.options.key_bindings().matching_action_shortcut_index(
+            &actions,
+            shortcut,
+            |key_bindings, actions, index| key_bindings.message_action_shortcuts(actions, index),
+            |action| action.enabled,
+        )?;
         self.select_message_action_row(index);
         self.activate_selected_message_action()
     }
@@ -320,13 +319,13 @@ impl DashboardState {
         Some(AppCommand::OpenUrl { url })
     }
 
-    pub fn activate_message_url_shortcut(&mut self, shortcut: char) -> Option<AppCommand> {
+    pub fn activate_message_url_shortcut(&mut self, shortcut: KeyChord) -> Option<AppCommand> {
         let urls = self.selected_message_url_items();
         let index = urls.iter().enumerate().position(|(index, _)| {
             self.options
                 .key_bindings()
                 .indexed_shortcut(index)
-                .is_some_and(|candidate| candidate == shortcut)
+                .is_some_and(|candidate| shortcut.matches_char(candidate))
         })?;
         self.select_message_url_row(index);
         self.activate_selected_message_url()

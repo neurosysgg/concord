@@ -184,6 +184,34 @@ fn scoped_channel_action_keys_work_as_aliases() {
 }
 
 #[test]
+fn scoped_channel_action_modified_shortcut_requires_matching_modifier() {
+    let mut channel_actions = BTreeMap::new();
+    channel_actions.insert("MuteChannel".to_owned(), KeymapBinding::one("<C-u>"));
+    let mut state = state_with_keymap(KeymapOptions {
+        leader: None,
+        groups: BTreeMap::new(),
+        channel_actions,
+        ..Default::default()
+    });
+    state = state_with_messages_from_state(state, 1);
+    state.focus_pane(FocusPane::Channels);
+
+    handle_key(&mut state, char_key(' '));
+    handle_key(&mut state, char_key('a'));
+    handle_key(&mut state, char_key('u'));
+
+    assert!(!state.is_channel_action_mute_duration_phase());
+    assert!(!state.is_leader_active());
+
+    handle_key(&mut state, char_key(' '));
+    handle_key(&mut state, char_key('a'));
+    handle_key(&mut state, ctrl_key('u'));
+
+    assert!(state.is_leader_action_mode());
+    assert!(state.is_channel_action_mute_duration_phase());
+}
+
+#[test]
 fn keymap_can_execute_leader_and_options_actions() {
     let mut mappings = BTreeMap::new();
     mappings.insert(
@@ -361,7 +389,7 @@ fn keymap_direct_open_pane_filter_replaces_slash_default() {
 #[test]
 fn custom_leader_replaces_space_leader_key() {
     let mut state = state_with_keymap(KeymapOptions {
-        leader: Some("ctrl+k".to_owned()),
+        leader: Some("<C-k>".to_owned()),
         groups: BTreeMap::new(),
         mappings: BTreeMap::new(),
         ..Default::default()

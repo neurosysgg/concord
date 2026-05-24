@@ -219,10 +219,10 @@ fn ctrl_backspace_deletes_previous_composer_word() {
 fn composer_keymap_can_remap_editor_and_delete_word() {
     let state = state_with_keymap(KeymapOptions {
         composer: [
-            ("OpenEditor".to_owned(), KeymapBinding::one("ctrl+o")),
+            ("OpenEditor".to_owned(), KeymapBinding::one("<C-o>")),
             (
                 "DeletePreviousWord".to_owned(),
-                KeymapBinding::one("alt+backspace"),
+                KeymapBinding::one("<A-backspace>"),
             ),
         ]
         .into_iter()

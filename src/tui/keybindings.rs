@@ -61,7 +61,7 @@ struct ActionShortcutBindings {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ActionShortcutBinding<K> {
     kind: K,
-    shortcuts: Vec<char>,
+    shortcuts: Vec<KeyChord>,
     description: Option<String>,
 }
 
@@ -220,7 +220,7 @@ pub(in crate::tui) enum ChannelSwitcherAction {
 pub(in crate::tui) enum LeaderActionMenuAction {
     BackOrClose,
     Close,
-    ActivateShortcut(char),
+    ActivateShortcut(KeyChord),
     UnknownClose,
 }
 
@@ -229,7 +229,7 @@ pub(in crate::tui) enum PopupListAction {
     Close,
     Select(SelectionAction),
     ActivateSelected,
-    ActivateShortcut(char),
+    ActivateShortcut(KeyChord),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -757,13 +757,17 @@ impl KeyMap {
 }
 
 fn keymap_leader(options: &KeymapOptions) -> std::result::Result<KeyChord, String> {
-    let leader = options
-        .leader
-        .as_deref()
-        .map(KeyChord::from_str)
-        .transpose()?
-        .unwrap_or_else(|| char_chord(' '))
-        .canonical();
+    let leader = match options.leader.as_deref() {
+        Some(value) => {
+            let sequence = KeySequence::parse(value, char_chord(' '))?;
+            let [leader] = sequence.0.as_slice() else {
+                return Err("leader must be a single key".to_owned());
+            };
+            *leader
+        }
+        None => char_chord(' '),
+    }
+    .canonical();
     if is_reserved_keymap_chord(leader) {
         return Err(format!("leader: {} is reserved", leader.label()));
     }
@@ -951,7 +955,7 @@ fn parse_action_scope<K: Copy + Eq>(
 
 fn parse_action_shortcut_binding_lossy(
     binding: &KeymapBinding,
-) -> Option<(Vec<char>, Option<String>)> {
+) -> Option<(Vec<KeyChord>, Option<String>)> {
     let shortcuts = binding
         .keys
         .iter()
@@ -964,7 +968,7 @@ fn parse_action_shortcut_binding_lossy(
 fn parse_action_shortcut_binding(
     action_name: &str,
     binding: &KeymapBinding,
-) -> std::result::Result<(Vec<char>, Option<String>), String> {
+) -> std::result::Result<(Vec<KeyChord>, Option<String>), String> {
     let mut shortcuts = Vec::new();
     for key in &binding.keys {
         shortcuts.push(
@@ -979,16 +983,13 @@ fn parse_action_shortcut_binding(
     Ok((shortcuts, binding.description.clone()))
 }
 
-fn parse_action_shortcut_key(value: &str) -> std::result::Result<char, String> {
+fn parse_action_shortcut_key(value: &str) -> std::result::Result<KeyChord, String> {
     let sequence = KeySequence::parse(value, char_chord(' '))?;
     let [key] = sequence.0.as_slice() else {
         return Err("action shortcut must be a single key".to_owned());
     };
-    if !key.modifiers.is_empty() {
-        return Err("action shortcut cannot use modifiers".to_owned());
-    }
     match key.code {
-        KeyCode::Char(value) if !value.is_whitespace() => Ok(value),
+        KeyCode::Char(value) if !value.is_whitespace() => Ok(key.canonical()),
         _ => Err("action shortcut must be a character key".to_owned()),
     }
 }
@@ -1021,6 +1022,11 @@ fn parse_sequence_token(
     if token.is_empty() {
         return Ok(Vec::new());
     }
+    if token.contains('+') {
+        return Err(format!(
+            "unsupported key `{token}`; use Vim-style angle modifiers like `<C-w>`"
+        ));
+    }
     if !token.contains('<') {
         return parse_plain_sequence_token(token);
     }
@@ -1042,6 +1048,11 @@ fn parse_sequence_token(
         } else {
             let next_angle = rest.find('<').unwrap_or(rest.len());
             let segment = &rest[..next_angle];
+            if looks_like_bare_modifier_key(segment) {
+                return Err(format!(
+                    "unsupported key `{segment}`; use Vim-style angle modifiers like `<C-w>`"
+                ));
+            }
             keys.extend(segment.chars().map(char_chord));
             rest = &rest[next_angle..];
         }
@@ -1050,6 +1061,11 @@ fn parse_sequence_token(
 }
 
 fn parse_plain_sequence_token(token: &str) -> std::result::Result<Vec<KeyChord>, String> {
+    if looks_like_bare_modifier_key(token) {
+        return Err(format!(
+            "unsupported key `{token}`; use Vim-style angle modifiers like `<C-w>`"
+        ));
+    }
     match KeyChord::from_str(token) {
         Ok(key) => Ok(vec![key]),
         Err(error) => {
@@ -1061,7 +1077,37 @@ fn parse_plain_sequence_token(token: &str) -> std::result::Result<Vec<KeyChord>,
     }
 }
 
+fn looks_like_bare_modifier_key(value: &str) -> bool {
+    let Some((modifier, key)) = value.split_once('-') else {
+        return false;
+    };
+    if key.is_empty() {
+        return false;
+    }
+    matches!(
+        modifier,
+        "C" | "S"
+            | "A"
+            | "M"
+            | "c"
+            | "s"
+            | "a"
+            | "m"
+            | "ctrl"
+            | "control"
+            | "shift"
+            | "alt"
+            | "meta"
+    )
+}
+
 fn parse_angle_key(value: &str) -> std::result::Result<KeyChord, String> {
+    if value.contains('+') {
+        return Err(format!(
+            "unsupported angle key `{value}`; use Vim-style hyphen modifiers like `C-w`"
+        ));
+    }
+
     let parts = value.split('-').map(str::trim).collect::<Vec<_>>();
     let Some((key, modifier_parts)) = parts.split_last() else {
         return KeyChord::from_str(value);
@@ -1072,11 +1118,11 @@ fn parse_angle_key(value: &str) -> std::result::Result<KeyChord, String> {
 
     let mut modifiers = KeyModifiers::empty();
     for modifier in modifier_parts {
-        match modifier.to_ascii_lowercase().as_str() {
-            "c" | "ctrl" | "control" => modifiers.insert(KeyModifiers::CONTROL),
-            "s" | "shift" => modifiers.insert(KeyModifiers::SHIFT),
-            "a" | "alt" | "m" | "meta" => modifiers.insert(KeyModifiers::ALT),
-            _ => return KeyChord::from_str(value),
+        match *modifier {
+            "C" => modifiers.insert(KeyModifiers::CONTROL),
+            "S" => modifiers.insert(KeyModifiers::SHIFT),
+            "A" | "M" => modifiers.insert(KeyModifiers::ALT),
+            unknown => return Err(format!("unsupported angle key modifier `{unknown}`")),
         }
     }
 
@@ -1324,6 +1370,14 @@ fn all_ui_actions() -> &'static [UiAction] {
 }
 
 impl KeyChord {
+    pub(in crate::tui) fn matches_chord(self, other: Self) -> bool {
+        key_chords_match_same_event(self, other)
+    }
+
+    pub(in crate::tui) fn matches_char(self, value: char) -> bool {
+        self.matches_chord(char_chord(value))
+    }
+
     fn matches(self, key: KeyEvent) -> bool {
         let expected = self.canonical();
         let actual = Self {
@@ -1332,6 +1386,10 @@ impl KeyChord {
         }
         .canonical();
 
+        // Crossterm and terminals are not perfectly uniform for shifted letters:
+        // Shift+r may arrive as `Char('r') + SHIFT`, `Char('R')`, or both.
+        // Keep these forms equivalent so configured shortcuts and conflict checks
+        // describe the user's physical key press, not one terminal's encoding.
         expected == actual
             || matches!(expected.code, KeyCode::Char(value) if value.is_ascii_lowercase())
                 && expected.modifiers.contains(KeyModifiers::SHIFT)
@@ -1362,7 +1420,7 @@ impl KeyChord {
         }
     }
 
-    fn label(self) -> String {
+    pub(in crate::tui) fn label(self) -> String {
         let mut parts = Vec::new();
         if self.modifiers.contains(KeyModifiers::CONTROL) {
             parts.push("Ctrl".to_owned());
@@ -1409,24 +1467,16 @@ impl FromStr for KeyChord {
             return Err("keybinding cannot be empty".to_owned());
         }
 
-        let mut modifiers = KeyModifiers::empty();
-        let parts = value.split('+').map(str::trim).collect::<Vec<_>>();
-        let Some((key, modifier_parts)) = parts.split_last() else {
-            return Err("keybinding cannot be empty".to_owned());
-        };
-        for modifier in modifier_parts {
-            match modifier.to_ascii_lowercase().as_str() {
-                "ctrl" | "control" => modifiers.insert(KeyModifiers::CONTROL),
-                "alt" => modifiers.insert(KeyModifiers::ALT),
-                "shift" => modifiers.insert(KeyModifiers::SHIFT),
-                unknown => return Err(format!("unsupported key modifier `{unknown}`")),
-            }
+        if value.contains('+') {
+            return Err(format!(
+                "unsupported key `{value}`; use Vim-style angle modifiers like `<C-w>`"
+            ));
         }
 
-        let code = parse_key_code(key)?;
+        let code = parse_key_code(value)?;
         Ok(Self {
             code,
-            modifiers: normalized_modifiers(modifiers),
+            modifiers: KeyModifiers::empty(),
         })
     }
 }
@@ -1576,6 +1626,9 @@ fn composer_shortcuts_have_conflicts(
 }
 
 fn key_chords_match_same_event(left: KeyChord, right: KeyChord) -> bool {
+    // Compare by possible terminal events rather than raw fields. This keeps
+    // `A`, `Shift+a`, and uppercase-with-Shift encodings from being treated as
+    // independent shortcuts when they can be produced by the same key press.
     candidate_key_events(left)
         .into_iter()
         .chain(candidate_key_events(right))
@@ -1973,8 +2026,8 @@ impl KeyBindings {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 LeaderActionMenuAction::Close
             }
-            KeyCode::Char(shortcut) if is_shortcut_key(key) => {
-                LeaderActionMenuAction::ActivateShortcut(shortcut)
+            KeyCode::Char(_) => {
+                LeaderActionMenuAction::ActivateShortcut(self.keymap_chord_for_event(key))
             }
             code if is_left_key(code) => LeaderActionMenuAction::BackOrClose,
             _ => LeaderActionMenuAction::UnknownClose,
@@ -1991,9 +2044,9 @@ impl KeyBindings {
 
         match key.code {
             code if is_confirm_key(code) => Some(PopupListAction::ActivateSelected),
-            KeyCode::Char(shortcut) if is_shortcut_key(key) => {
-                Some(PopupListAction::ActivateShortcut(shortcut))
-            }
+            KeyCode::Char(_) => Some(PopupListAction::ActivateShortcut(
+                self.keymap_chord_for_event(key),
+            )),
             _ => None,
         }
     }
@@ -2398,174 +2451,120 @@ impl KeyBindings {
         &self,
         actions: &[ChannelActionItem],
         index: usize,
-    ) -> Vec<char> {
-        if index >= actions.len() {
-            return Vec::new();
-        }
-        action_shortcuts(
+    ) -> Vec<KeyChord> {
+        scoped_action_shortcuts(
             index,
-            actions
-                .iter()
-                .map(|item| self.channel_action_shortcut_candidates(item.kind)),
+            actions.iter().map(|item| item.kind),
+            &self.action_shortcuts.channel,
+            |kind| self.default_channel_action_shortcut(kind),
         )
     }
 
     pub fn channel_action_label(&self, action: &ChannelActionItem) -> String {
-        self.action_shortcuts
-            .channel
-            .iter()
-            .find(|binding| binding.kind == action.kind)
-            .and_then(|binding| binding.description.clone())
-            .unwrap_or_else(|| action.label.clone())
+        action_label(&self.action_shortcuts.channel, action.kind, &action.label)
     }
 
-    fn channel_action_shortcut_candidates(&self, kind: ChannelActionKind) -> Vec<char> {
-        self.action_shortcuts
-            .channel
-            .iter()
-            .find(|binding| binding.kind == kind)
-            .map(|binding| binding.shortcuts.clone())
-            .unwrap_or_else(|| vec![self.default_channel_action_shortcut(kind)])
-    }
-
-    fn default_channel_action_shortcut(&self, kind: ChannelActionKind) -> char {
-        match kind {
+    fn default_channel_action_shortcut(&self, kind: ChannelActionKind) -> Vec<KeyChord> {
+        vec![char_chord(match kind {
             ChannelActionKind::JoinVoice => 'j',
             ChannelActionKind::LeaveVoice => 'l',
             ChannelActionKind::LoadPinnedMessages => 'p',
             ChannelActionKind::ShowThreads => 't',
             ChannelActionKind::MarkAsRead => 'm',
             ChannelActionKind::ToggleMute => 'u',
-        }
+        })]
     }
 
-    pub fn guild_action_shortcuts(&self, actions: &[GuildActionItem], index: usize) -> Vec<char> {
-        if index >= actions.len() {
-            return Vec::new();
-        }
-        action_shortcuts(
+    pub fn guild_action_shortcuts(
+        &self,
+        actions: &[GuildActionItem],
+        index: usize,
+    ) -> Vec<KeyChord> {
+        scoped_action_shortcuts(
             index,
-            actions
-                .iter()
-                .map(|item| self.guild_action_shortcut_candidates(item.kind)),
+            actions.iter().map(|item| item.kind),
+            &self.action_shortcuts.guild,
+            |kind| self.default_guild_action_shortcut(kind),
         )
     }
 
     pub fn guild_action_label(&self, action: &GuildActionItem) -> String {
-        self.action_shortcuts
-            .guild
-            .iter()
-            .find(|binding| binding.kind == action.kind)
-            .and_then(|binding| binding.description.clone())
-            .unwrap_or_else(|| action.label.clone())
+        action_label(&self.action_shortcuts.guild, action.kind, &action.label)
     }
 
-    fn guild_action_shortcut_candidates(&self, kind: GuildActionKind) -> Vec<char> {
-        if let Some(binding) = self
-            .action_shortcuts
-            .guild
-            .iter()
-            .find(|binding| binding.kind == kind)
-        {
-            return binding.shortcuts.clone();
-        }
-        self.default_guild_action_shortcut(kind)
-            .into_iter()
-            .collect()
-    }
-
-    fn default_guild_action_shortcut(&self, kind: GuildActionKind) -> Option<char> {
+    fn default_guild_action_shortcut(&self, kind: GuildActionKind) -> Vec<KeyChord> {
         match kind {
-            GuildActionKind::MarkAsRead => Some('m'),
-            GuildActionKind::ToggleMute => Some('u'),
-            GuildActionKind::NoActionsYet => None,
+            GuildActionKind::MarkAsRead => vec![char_chord('m')],
+            GuildActionKind::ToggleMute => vec![char_chord('u')],
+            GuildActionKind::NoActionsYet => Vec::new(),
         }
     }
 
-    pub fn member_action_shortcuts(&self, actions: &[MemberActionItem], index: usize) -> Vec<char> {
-        if index >= actions.len() {
-            return Vec::new();
-        }
-        action_shortcuts(
+    pub fn member_action_shortcuts(
+        &self,
+        actions: &[MemberActionItem],
+        index: usize,
+    ) -> Vec<KeyChord> {
+        scoped_action_shortcuts(
             index,
-            actions
-                .iter()
-                .map(|item| self.member_action_shortcut_candidates(item.kind)),
+            actions.iter().map(|item| item.kind),
+            &self.action_shortcuts.member,
+            |kind| self.default_member_action_shortcut(kind),
         )
     }
 
     pub fn member_action_label(&self, action: &MemberActionItem) -> String {
-        self.action_shortcuts
-            .member
-            .iter()
-            .find(|binding| binding.kind == action.kind)
-            .and_then(|binding| binding.description.clone())
-            .unwrap_or_else(|| action.label.clone())
+        action_label(&self.action_shortcuts.member, action.kind, &action.label)
     }
 
-    fn member_action_shortcut_candidates(&self, kind: MemberActionKind) -> Vec<char> {
-        self.action_shortcuts
-            .member
-            .iter()
-            .find(|binding| binding.kind == kind)
-            .map(|binding| binding.shortcuts.clone())
-            .unwrap_or_else(|| vec![self.default_member_action_shortcut(kind)])
-    }
-
-    fn default_member_action_shortcut(&self, kind: MemberActionKind) -> char {
-        match kind {
+    fn default_member_action_shortcut(&self, kind: MemberActionKind) -> Vec<KeyChord> {
+        vec![char_chord(match kind {
             MemberActionKind::ShowProfile => 'p',
-        }
+        })]
     }
 
     pub fn message_action_shortcuts(
         &self,
         actions: &[MessageActionItem],
         index: usize,
-    ) -> Vec<char> {
-        if index >= actions.len() {
-            return Vec::new();
-        }
-        action_shortcuts(
+    ) -> Vec<KeyChord> {
+        scoped_action_shortcuts(
             index,
             actions
                 .iter()
-                .map(|item| self.message_action_shortcut_candidates(item.kind)),
+                .map(|item| MessageActionShortcutKind::from(item.kind)),
+            &self.action_shortcuts.message,
+            |kind| self.default_message_action_shortcut(kind),
         )
     }
 
     pub fn message_action_label(&self, action: &MessageActionItem) -> String {
         let kind = MessageActionShortcutKind::from(action.kind);
-        self.action_shortcuts
-            .message
-            .iter()
-            .find(|binding| binding.kind == kind)
-            .and_then(|binding| binding.description.clone())
-            .unwrap_or_else(|| action.label.clone())
+        action_label(&self.action_shortcuts.message, kind, &action.label)
     }
 
-    fn message_action_shortcut_candidates(&self, kind: MessageActionKind) -> Vec<char> {
-        let shortcut_kind = MessageActionShortcutKind::from(kind);
-        if let Some(binding) = self
-            .action_shortcuts
-            .message
-            .iter()
-            .find(|binding| binding.kind == shortcut_kind)
-        {
-            return binding.shortcuts.clone();
-        }
-        self.default_message_action_shortcut(shortcut_kind)
-            .into_iter()
-            .collect()
-    }
-
-    fn default_message_action_shortcut(&self, kind: MessageActionShortcutKind) -> Option<char> {
+    fn default_message_action_shortcut(&self, kind: MessageActionShortcutKind) -> Vec<KeyChord> {
         match kind {
-            MessageActionShortcutKind::OpenThread => Some('t'),
-            MessageActionShortcutKind::DownloadAttachment => Some('f'),
-            MessageActionShortcutKind::ShowReactionUsers => Some('u'),
-            MessageActionShortcutKind::OpenPollVotePicker => Some('c'),
+            MessageActionShortcutKind::OpenThread => vec![char_chord('t')],
+            MessageActionShortcutKind::DownloadAttachment => vec![char_chord('f')],
+            MessageActionShortcutKind::ShowReactionUsers => vec![char_chord('u')],
+            MessageActionShortcutKind::OpenPollVotePicker => vec![char_chord('c')],
         }
+    }
+
+    pub(in crate::tui) fn matching_action_shortcut_index<A>(
+        &self,
+        actions: &[A],
+        shortcut: KeyChord,
+        shortcuts: impl Fn(&Self, &[A], usize) -> Vec<KeyChord>,
+        is_enabled: impl Fn(&A) -> bool,
+    ) -> Option<usize> {
+        actions.iter().enumerate().position(|(index, action)| {
+            is_enabled(action)
+                && shortcuts(self, actions, index)
+                    .iter()
+                    .any(|candidate| candidate.matches_chord(shortcut))
+        })
     }
 
     pub fn indexed_shortcut(&self, index: usize) -> Option<char> {
@@ -2607,6 +2606,51 @@ fn indexed_shortcut(index: usize) -> Option<char> {
     }
 }
 
+fn action_label<K>(bindings: &[ActionShortcutBinding<K>], kind: K, fallback: &str) -> String
+where
+    K: Copy + Eq,
+{
+    bindings
+        .iter()
+        .find(|binding| binding.kind == kind)
+        .and_then(|binding| binding.description.clone())
+        .unwrap_or_else(|| fallback.to_owned())
+}
+
+fn scoped_action_shortcuts<K>(
+    index: usize,
+    kinds: impl IntoIterator<Item = K>,
+    bindings: &[ActionShortcutBinding<K>],
+    default_shortcuts: impl Fn(K) -> Vec<KeyChord>,
+) -> Vec<KeyChord>
+where
+    K: Copy + Eq,
+{
+    let shortcut_sets = kinds
+        .into_iter()
+        .map(|kind| action_shortcut_candidates(bindings, kind, &default_shortcuts))
+        .collect::<Vec<_>>();
+    if index >= shortcut_sets.len() {
+        return Vec::new();
+    }
+    action_shortcuts(index, shortcut_sets)
+}
+
+fn action_shortcut_candidates<K>(
+    bindings: &[ActionShortcutBinding<K>],
+    kind: K,
+    default_shortcuts: &impl Fn(K) -> Vec<KeyChord>,
+) -> Vec<KeyChord>
+where
+    K: Copy + Eq,
+{
+    bindings
+        .iter()
+        .find(|binding| binding.kind == kind)
+        .map(|binding| binding.shortcuts.clone())
+        .unwrap_or_else(|| default_shortcuts(kind))
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OptionsCategoryShortcut {
     Display,
@@ -2639,7 +2683,10 @@ fn is_composer_newline_key(key: KeyEvent) -> bool {
     }
 }
 
-fn action_shortcuts(index: usize, shortcut_sets: impl IntoIterator<Item = Vec<char>>) -> Vec<char> {
+fn action_shortcuts(
+    index: usize,
+    shortcut_sets: impl IntoIterator<Item = Vec<KeyChord>>,
+) -> Vec<KeyChord> {
     let shortcut_sets = shortcut_sets.into_iter().collect::<Vec<_>>();
     let Some(preferred) = shortcut_sets.get(index) else {
         return Vec::new();
@@ -2668,25 +2715,37 @@ fn action_shortcuts(index: usize, shortcut_sets: impl IntoIterator<Item = Vec<ch
     Vec::new()
 }
 
-fn first_unused_indexed_shortcut(used: &[char]) -> Option<char> {
+fn first_unused_indexed_shortcut(used: &[KeyChord]) -> Option<KeyChord> {
     (0..10)
         .filter_map(indexed_shortcut)
-        .find(|shortcut| !used.contains(shortcut))
+        .map(char_chord)
+        .find(|shortcut| {
+            !used
+                .iter()
+                .any(|used| key_chords_match_same_event(*used, *shortcut))
+        })
 }
 
 fn unique_action_shortcuts(
-    preferred: &[char],
-    shortcut_sets: impl IntoIterator<Item = Vec<char>>,
-) -> Vec<char> {
+    preferred: &[KeyChord],
+    shortcut_sets: impl IntoIterator<Item = Vec<KeyChord>>,
+) -> Vec<KeyChord> {
     let shortcut_sets = shortcut_sets.into_iter().collect::<Vec<_>>();
     let mut unique = Vec::new();
     for candidate in preferred.iter().copied() {
-        if unique.contains(&candidate) {
+        if unique
+            .iter()
+            .any(|unique| key_chords_match_same_event(*unique, candidate))
+        {
             continue;
         }
         let matches = shortcut_sets
             .iter()
-            .filter(|shortcuts| shortcuts.contains(&candidate))
+            .filter(|shortcuts| {
+                shortcuts
+                    .iter()
+                    .any(|shortcut| key_chords_match_same_event(*shortcut, candidate))
+            })
             .count();
         if matches == 1 {
             unique.push(candidate);
@@ -2699,19 +2758,36 @@ fn unique_action_shortcuts(
 mod tests {
     use super::*;
 
+    fn char_chords(values: &[char]) -> Vec<KeyChord> {
+        values.iter().copied().map(char_chord).collect()
+    }
+
     #[test]
-    fn key_chord_parses_modifiers_and_labels() {
-        let chord = KeyChord::from_str("ctrl+k").expect("ctrl key should parse");
+    fn key_chord_parses_bare_keys_and_labels() {
+        let chord = KeyChord::from_str("k").expect("key should parse");
 
         assert_eq!(chord.code, KeyCode::Char('k'));
-        assert_eq!(chord.modifiers, KeyModifiers::CONTROL);
-        assert_eq!(chord.label(), "Ctrl+k");
+        assert_eq!(chord.modifiers, KeyModifiers::NONE);
+        assert_eq!(chord.label(), "k");
+    }
+
+    #[test]
+    fn key_chord_rejects_legacy_plus_modifier_syntax() {
+        let cases = ["ctrl+k", "control+k", "shift+tab", "alt+backspace"];
+
+        for value in cases {
+            assert!(
+                KeyChord::from_str(value).is_err(),
+                "{value} should not parse as a key chord"
+            );
+        }
     }
 
     #[test]
     fn angle_key_parses_neovim_modifier_aliases() {
         let cases = [
             ("C-f", KeyCode::Char('f'), KeyModifiers::CONTROL, "Ctrl+f"),
+            ("C-w", KeyCode::Char('w'), KeyModifiers::CONTROL, "Ctrl+w"),
             ("S-f", KeyCode::Char('f'), KeyModifiers::SHIFT, "Shift+f"),
             ("A-f", KeyCode::Char('f'), KeyModifiers::ALT, "Alt+f"),
             ("M-f", KeyCode::Char('f'), KeyModifiers::ALT, "Alt+f"),
@@ -2728,6 +2804,51 @@ mod tests {
             assert_eq!(chord.code, code);
             assert_eq!(chord.modifiers, modifiers);
             assert_eq!(chord.label(), label);
+        }
+    }
+
+    #[test]
+    fn angle_key_rejects_non_vim_modifier_spellings() {
+        let cases = [
+            "ctrl+w",
+            "C+w",
+            "ctrl-w",
+            "control-w",
+            "shift-f",
+            "alt-f",
+            "c-w",
+        ];
+
+        for value in cases {
+            assert!(
+                parse_angle_key(value).is_err(),
+                "{value} should not parse as an angle key"
+            );
+        }
+    }
+
+    #[test]
+    fn keymap_rejects_legacy_modifier_syntax_in_mixed_tokens() {
+        let cases = [
+            "ctrl+u<C-w>",
+            "<C-w>ctrl+u",
+            "ctrl-w",
+            "C-w",
+            "alt-backspace",
+        ];
+
+        for value in cases {
+            let keymap = KeymapOptions {
+                mappings: [("ChannelSwitcher".to_owned(), KeymapBinding::one(value))]
+                    .into_iter()
+                    .collect(),
+                ..Default::default()
+            };
+
+            assert!(
+                KeyBindings::try_from_options(&keymap).is_err(),
+                "{value} should not parse as a keymap sequence"
+            );
         }
     }
 
@@ -2847,7 +2968,7 @@ mod tests {
         }];
         assert_eq!(
             key_bindings.guild_action_shortcuts(&guild_actions, 0),
-            vec!['x']
+            char_chords(&['x'])
         );
         assert_eq!(
             key_bindings.guild_action_label(&guild_actions[0]),
@@ -2861,7 +2982,7 @@ mod tests {
         }];
         assert_eq!(
             key_bindings.channel_action_shortcuts(&channel_actions, 0),
-            vec!['x']
+            char_chords(&['x'])
         );
 
         let member_actions = [MemberActionItem {
@@ -2871,7 +2992,7 @@ mod tests {
         }];
         assert_eq!(
             key_bindings.member_action_shortcuts(&member_actions, 0),
-            vec!['s']
+            char_chords(&['s'])
         );
 
         let message_actions = [
@@ -2888,11 +3009,11 @@ mod tests {
         ];
         assert_eq!(
             key_bindings.message_action_shortcuts(&message_actions, 0),
-            vec!['R']
+            char_chords(&['R'])
         );
         assert_eq!(
             key_bindings.message_action_shortcuts(&message_actions, 1),
-            vec!['r']
+            char_chords(&['r'])
         );
         assert_eq!(
             key_bindings.message_action_label(&message_actions[0]),
@@ -2946,11 +3067,11 @@ mod tests {
 
         assert_eq!(
             key_bindings.channel_action_shortcuts(&actions, 0),
-            vec!['1']
+            char_chords(&['1'])
         );
         assert_eq!(
             key_bindings.channel_action_shortcuts(&actions, 1),
-            vec!['z']
+            char_chords(&['z'])
         );
     }
 
@@ -2978,7 +3099,38 @@ mod tests {
 
         assert_eq!(
             key_bindings.channel_action_shortcuts(&actions, 0),
-            vec!['x', 'u']
+            char_chords(&['x', 'u'])
+        );
+    }
+
+    #[test]
+    fn scoped_action_keymaps_keep_modified_shortcuts_distinct() {
+        let keymap = KeymapOptions {
+            channel_actions: [(
+                "MuteChannel".to_owned(),
+                KeymapBinding {
+                    keys: vec!["u".to_owned(), "<C-u>".to_owned()],
+                    description: None,
+                },
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        };
+        let key_bindings =
+            KeyBindings::try_from_options(&keymap).expect("scoped action keymaps should parse");
+        let actions = [ChannelActionItem {
+            kind: ChannelActionKind::ToggleMute,
+            label: "Mute channel".to_owned(),
+            enabled: true,
+        }];
+
+        assert_eq!(
+            key_bindings.channel_action_shortcuts(&actions, 0),
+            vec![
+                KeyChord::from_str("u").expect("u should parse"),
+                parse_angle_key("C-u").expect("C-u should parse"),
+            ]
         );
     }
 
@@ -3010,11 +3162,11 @@ mod tests {
 
         assert_eq!(
             key_bindings.channel_action_shortcuts(&actions, 0),
-            vec!['2']
+            char_chords(&['2'])
         );
         assert_eq!(
             key_bindings.channel_action_shortcuts(&actions, 1),
-            vec!['3']
+            char_chords(&['3'])
         );
     }
 
@@ -3022,11 +3174,11 @@ mod tests {
     fn composer_keymaps_override_default_composer_shortcuts() {
         let keymap = KeymapOptions {
             composer: [
-                ("OpenEditor".to_owned(), KeymapBinding::one("ctrl+o")),
+                ("OpenEditor".to_owned(), KeymapBinding::one("<C-o>")),
                 (
                     "DeletePreviousWord".to_owned(),
                     KeymapBinding {
-                        keys: vec!["alt+backspace".to_owned()],
+                        keys: vec!["<A-backspace>".to_owned()],
                         description: None,
                     },
                 ),
@@ -3058,7 +3210,7 @@ mod tests {
     #[test]
     fn composer_keymaps_reject_unknown_actions_and_conflicts() {
         let unknown = KeymapOptions {
-            composer: [("MuteChannel".to_owned(), KeymapBinding::one("ctrl+m"))]
+            composer: [("MuteChannel".to_owned(), KeymapBinding::one("<C-m>"))]
                 .into_iter()
                 .collect(),
             ..Default::default()
@@ -3067,8 +3219,8 @@ mod tests {
 
         let conflicting = KeymapOptions {
             composer: [
-                ("OpenEditor".to_owned(), KeymapBinding::one("ctrl+o")),
-                ("ClearInput".to_owned(), KeymapBinding::one("ctrl+o")),
+                ("OpenEditor".to_owned(), KeymapBinding::one("<C-o>")),
+                ("ClearInput".to_owned(), KeymapBinding::one("<C-o>")),
             ]
             .into_iter()
             .collect(),
@@ -3079,7 +3231,7 @@ mod tests {
         let shifted_printable_conflict = KeymapOptions {
             composer: [
                 ("OpenEditor".to_owned(), KeymapBinding::one("A")),
-                ("ClearInput".to_owned(), KeymapBinding::one("shift+a")),
+                ("ClearInput".to_owned(), KeymapBinding::one("<S-a>")),
             ]
             .into_iter()
             .collect(),
@@ -3218,8 +3370,7 @@ mod tests {
             .collect(),
             ..Default::default()
         };
-        let key_bindings =
-            KeyBindings::try_from_options(&keymap).expect("leader ctrl-w should parse");
+        let key_bindings = KeyBindings::try_from_options(&keymap).expect("leader C-w should parse");
         let leader_prefix = key_bindings.leader_keymap_prefix();
 
         assert!(
@@ -3345,13 +3496,13 @@ mod tests {
     #[test]
     fn keymap_configured_mapping_removes_canonical_default_alias_conflicts() {
         let keymap = KeymapOptions {
-            mappings: [("VoiceDeafen".to_owned(), KeymapBinding::one("shift+tab d"))]
+            mappings: [("VoiceDeafen".to_owned(), KeymapBinding::one("<S-tab> d"))]
                 .into_iter()
                 .collect(),
             ..Default::default()
         };
         let key_bindings = KeyBindings::try_from_options(&keymap).expect("prefix should parse");
-        let prefix = [KeyChord::from_str("shift+tab").expect("shift tab should parse")];
+        let prefix = [parse_angle_key("S-tab").expect("S-tab should parse")];
 
         assert_eq!(
             key_bindings.keymap_lookup_root_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT)),
@@ -3440,7 +3591,7 @@ mod tests {
     #[test]
     fn keymap_uses_custom_leader_key() {
         let keymap = KeymapOptions {
-            leader: Some("ctrl+k".to_owned()),
+            leader: Some("<C-k>".to_owned()),
             mappings: [("StartComposer".to_owned(), KeymapBinding::one("<leader>e"))]
                 .into_iter()
                 .collect(),

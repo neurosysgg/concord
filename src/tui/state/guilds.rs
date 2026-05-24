@@ -19,6 +19,7 @@ use super::{
 };
 use crate::discord::AppCommand;
 use crate::tui::fuzzy::{FuzzyMatchQuality, FuzzyScore, best_fuzzy_name_match_score};
+use crate::tui::keybindings::KeyChord;
 
 impl DashboardState {
     pub fn guild_name(&self, guild_id: Id<GuildMarker>) -> Option<&str> {
@@ -415,18 +416,18 @@ impl DashboardState {
         }
     }
 
-    pub fn activate_guild_action_shortcut(&mut self, shortcut: char) -> Option<AppCommand> {
+    pub fn activate_guild_action_shortcut(&mut self, shortcut: KeyChord) -> Option<AppCommand> {
         match self.popups.guild_leader_action.as_ref()? {
             GuildLeaderActionState::Actions { .. } => {
                 let actions = self.selected_guild_action_items();
-                let index = actions.iter().enumerate().position(|(index, action)| {
-                    action.enabled
-                        && self
-                            .options
-                            .key_bindings()
-                            .guild_action_shortcuts(&actions, index)
-                            .contains(&shortcut)
-                })?;
+                let index = self.options.key_bindings().matching_action_shortcut_index(
+                    &actions,
+                    shortcut,
+                    |key_bindings, actions, index| {
+                        key_bindings.guild_action_shortcuts(actions, index)
+                    },
+                    |action| action.enabled,
+                )?;
                 self.select_guild_action_row(index);
                 self.activate_selected_guild_action()
             }
@@ -436,7 +437,10 @@ impl DashboardState {
                     .iter()
                     .enumerate()
                     .position(|(index, _)| {
-                        self.options.key_bindings().indexed_shortcut(index) == Some(shortcut)
+                        self.options
+                            .key_bindings()
+                            .indexed_shortcut(index)
+                            .is_some_and(|candidate| shortcut.matches_char(candidate))
                     })?;
                 self.select_guild_action_row(index);
                 self.activate_selected_guild_action()

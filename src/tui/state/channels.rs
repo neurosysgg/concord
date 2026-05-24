@@ -20,6 +20,7 @@ use super::{
 };
 use crate::discord::AppCommand;
 use crate::tui::fuzzy::{FuzzyMatchQuality, FuzzyScore, fuzzy_name_match_score};
+use crate::tui::keybindings::KeyChord;
 
 const RECENT_CHANNEL_LIMIT: usize = 10;
 
@@ -663,18 +664,18 @@ impl DashboardState {
         }
     }
 
-    pub fn activate_channel_action_shortcut(&mut self, shortcut: char) -> Option<AppCommand> {
+    pub fn activate_channel_action_shortcut(&mut self, shortcut: KeyChord) -> Option<AppCommand> {
         match self.popups.channel_leader_action.as_ref()? {
             ChannelLeaderActionState::Actions { .. } => {
                 let actions = self.selected_channel_action_items();
-                let index = actions.iter().enumerate().position(|(index, action)| {
-                    action.enabled
-                        && self
-                            .options
-                            .key_bindings()
-                            .channel_action_shortcuts(&actions, index)
-                            .contains(&shortcut)
-                })?;
+                let index = self.options.key_bindings().matching_action_shortcut_index(
+                    &actions,
+                    shortcut,
+                    |key_bindings, actions, index| {
+                        key_bindings.channel_action_shortcuts(actions, index)
+                    },
+                    |action| action.enabled,
+                )?;
                 self.select_channel_action_row(index);
                 self.activate_selected_channel_action()
             }
@@ -684,7 +685,10 @@ impl DashboardState {
                     .iter()
                     .enumerate()
                     .position(|(index, _)| {
-                        self.options.key_bindings().indexed_shortcut(index) == Some(shortcut)
+                        self.options
+                            .key_bindings()
+                            .indexed_shortcut(index)
+                            .is_some_and(|candidate| shortcut.matches_char(candidate))
                     })?;
                 self.select_channel_action_row(index);
                 self.activate_selected_channel_action()
@@ -692,7 +696,10 @@ impl DashboardState {
             ChannelLeaderActionState::Threads { .. } => {
                 let threads = self.channel_action_thread_items();
                 let index = threads.iter().enumerate().position(|(index, _)| {
-                    self.options.key_bindings().indexed_shortcut(index) == Some(shortcut)
+                    self.options
+                        .key_bindings()
+                        .indexed_shortcut(index)
+                        .is_some_and(|candidate| shortcut.matches_char(candidate))
                 })?;
                 self.select_channel_action_row(index);
                 self.activate_selected_channel_action()

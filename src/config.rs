@@ -666,7 +666,7 @@ mod tests {
     #[test]
     fn keymap_options_parse_scoped_action_bindings() {
         let keymap = parse_keymap_options(
-            "[keymap.guild_actions]\nMuteServer = { keys = [\"m\"], description = \"mute server\" }\n\n[keymap.channel_actions]\nMuteChannel = \"x\"\n\n[keymap.member_actions]\nShowProfile = \"p\"\n\n[keymap.message_actions]\nOpenThread = { keys = [\"t\"], description = \"open thread\" }\n\n[keymap.composer]\nOpenEditor = \"ctrl+o\"\nDeletePreviousWord = { keys = [\"alt+backspace\"], description = \"delete word\" }\n",
+            "[keymap.guild_actions]\nMuteServer = { keys = [\"m\"], description = \"mute server\" }\n\n[keymap.channel_actions]\nMuteChannel = \"x\"\n\n[keymap.member_actions]\nShowProfile = \"p\"\n\n[keymap.message_actions]\nOpenThread = { keys = [\"t\"], description = \"open thread\" }\n\n[keymap.composer]\nOpenEditor = \"<C-o>\"\nDeletePreviousWord = { keys = [\"<A-backspace>\"], description = \"delete word\" }\n",
         );
 
         assert_eq!(
@@ -693,12 +693,12 @@ mod tests {
         );
         assert_eq!(
             keymap.composer.get("OpenEditor"),
-            Some(&crate::config::KeymapBinding::one("ctrl+o"))
+            Some(&crate::config::KeymapBinding::one("<C-o>"))
         );
         assert_eq!(
             keymap.composer.get("DeletePreviousWord"),
             Some(&crate::config::KeymapBinding {
-                keys: vec!["alt+backspace".to_owned()],
+                keys: vec!["<A-backspace>".to_owned()],
                 description: Some("delete word".to_owned()),
             })
         );
