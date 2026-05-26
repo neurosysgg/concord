@@ -18,6 +18,13 @@ pub struct KeyBindings {
     composer: ComposerKeyBindings,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::tui) struct KeymapBindingSummary {
+    pub scope: &'static str,
+    pub action: String,
+    pub keys: Vec<String>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(in crate::tui) struct KeyChord {
     code: KeyCode,
@@ -232,6 +239,7 @@ pub(in crate::tui) enum LeaderActionMenuAction {
 pub(in crate::tui) enum PopupListAction {
     Close,
     Select(SelectionAction),
+    Page(SelectionAction),
     ActivateSelected,
     ActivateShortcut(KeyChord),
 }
@@ -469,6 +477,26 @@ impl ActionShortcutBindings {
             )?,
         })
     }
+
+    fn binding_summaries(&self) -> Vec<KeymapBindingSummary> {
+        let mut summaries = Vec::new();
+        summaries.extend(self.guild.iter().map(|binding| KeymapBindingSummary {
+            scope: "keymap.guild_actions",
+            action: binding.kind.name().to_owned(),
+            keys: key_labels(&binding.shortcuts),
+        }));
+        summaries.extend(self.channel.iter().map(|binding| KeymapBindingSummary {
+            scope: "keymap.channel_actions",
+            action: binding.kind.name().to_owned(),
+            keys: key_labels(&binding.shortcuts),
+        }));
+        summaries.extend(self.member.iter().map(|binding| KeymapBindingSummary {
+            scope: "keymap.member_actions",
+            action: binding.kind.name().to_owned(),
+            keys: key_labels(&binding.shortcuts),
+        }));
+        summaries
+    }
 }
 
 impl Default for ComposerKeyBindings {
@@ -546,6 +574,17 @@ impl ComposerKeyBindings {
                 .any(|shortcut| shortcut.matches(key))
                 .then(|| binding.action.to_composer_action())
         })
+    }
+
+    fn binding_summaries(&self) -> Vec<KeymapBindingSummary> {
+        self.bindings
+            .iter()
+            .map(|binding| KeymapBindingSummary {
+                scope: "keymap.composer",
+                action: binding.action.name().to_owned(),
+                keys: key_labels(&binding.shortcuts),
+            })
+            .collect()
     }
 }
 
@@ -1249,6 +1288,14 @@ impl GuildActionKind {
             _ => None,
         }
     }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::NoActionsYet => "NoActionsYet",
+            Self::MarkAsRead => "MarkAsRead",
+            Self::ToggleMute => "ToggleMute",
+        }
+    }
 }
 
 impl ChannelActionKind {
@@ -1263,6 +1310,17 @@ impl ChannelActionKind {
             _ => None,
         }
     }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::JoinVoice => "JoinVoice",
+            Self::LeaveVoice => "LeaveVoice",
+            Self::LoadPinnedMessages => "ShowPinnedMessages",
+            Self::ShowThreads => "ShowThreads",
+            Self::MarkAsRead => "MarkAsRead",
+            Self::ToggleMute => "ToggleMute",
+        }
+    }
 }
 
 impl MemberActionKind {
@@ -1270,6 +1328,12 @@ impl MemberActionKind {
         match name {
             "ShowProfile" => Some(Self::ShowProfile),
             _ => None,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::ShowProfile => "ShowProfile",
         }
     }
 }
@@ -1314,6 +1378,28 @@ impl ComposerShortcutAction {
             "MoveCursorHome" => Some(Self::MoveCursorHome),
             "MoveCursorEnd" => Some(Self::MoveCursorEnd),
             _ => None,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::OpenEditor => "OpenEditor",
+            Self::PasteClipboard => "PasteClipboard",
+            Self::InsertNewline => "InsertNewline",
+            Self::Submit => "Submit",
+            Self::Close => "Close",
+            Self::ClearInput => "ClearInput",
+            Self::RemoveLastAttachment => "RemoveLastAttachment",
+            Self::DeletePreviousChar => "DeletePreviousChar",
+            Self::DeletePreviousWord => "DeletePreviousWord",
+            Self::MoveCursorUp => "MoveCursorUp",
+            Self::MoveCursorDown => "MoveCursorDown",
+            Self::MoveCursorWordLeft => "MoveCursorWordLeft",
+            Self::MoveCursorLeft => "MoveCursorLeft",
+            Self::MoveCursorWordRight => "MoveCursorWordRight",
+            Self::MoveCursorRight => "MoveCursorRight",
+            Self::MoveCursorHome => "MoveCursorHome",
+            Self::MoveCursorEnd => "MoveCursorEnd",
         }
     }
 
@@ -1825,6 +1911,28 @@ fn canonical_keymap_sequence(sequence: &[KeyChord]) -> Vec<KeyChord> {
     sequence.iter().map(|chord| chord.canonical()).collect()
 }
 
+fn keymap_sequence_label(sequence: &[KeyChord], leader: Option<KeyChord>) -> String {
+    sequence
+        .iter()
+        .map(|chord| keymap_popup_key_label(*chord, leader))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn key_labels(keys: &[KeyChord]) -> Vec<String> {
+    keys.iter()
+        .map(|key| keymap_popup_key_label(*key, None))
+        .collect()
+}
+
+fn keymap_popup_key_label(key: KeyChord, leader: Option<KeyChord>) -> String {
+    if leader.is_some_and(|leader| key.matches_chord(leader)) {
+        "<leader>".to_owned()
+    } else {
+        key.title_label()
+    }
+}
+
 fn key_chord(code: KeyCode) -> KeyChord {
     KeyChord {
         code,
@@ -1871,6 +1979,27 @@ fn key_code_label(code: KeyCode) -> String {
 }
 
 impl KeyBindings {
+    pub(in crate::tui) fn binding_summaries(&self) -> Vec<KeymapBindingSummary> {
+        let mut summaries = self
+            .keymap
+            .specs
+            .iter()
+            .map(|(action, spec)| KeymapBindingSummary {
+                scope: "keymap",
+                action: action.name().to_owned(),
+                keys: spec
+                    .sequences
+                    .iter()
+                    .map(|sequence| keymap_sequence_label(sequence, Some(self.keymap.leader)))
+                    .collect(),
+            })
+            .collect::<Vec<_>>();
+
+        summaries.extend(self.action_shortcuts.binding_summaries());
+        summaries.extend(self.composer.binding_summaries());
+        summaries
+    }
+
     fn binding_label(&self, action: UiAction) -> String {
         self.keymap.first_sequence_label(action)
     }
@@ -2082,6 +2211,9 @@ impl KeyBindings {
         if key.code == KeyCode::Esc {
             return Some(PopupListAction::Close);
         }
+        if let Some(action) = self.popup_page_action(key) {
+            return Some(PopupListAction::Page(action));
+        }
         if let Some(action) = self.selection_action(key, SelectionKeySet::Navigation) {
             return Some(PopupListAction::Select(action));
         }
@@ -2215,15 +2347,17 @@ impl KeyBindings {
         if key.code == KeyCode::Esc {
             return Some(ReactionUsersPopupAction::Close);
         }
+        if let Some(action) = self.popup_page_action(key) {
+            return Some(match action {
+                SelectionAction::Next => ReactionUsersPopupAction::PageDown,
+                SelectionAction::Previous => ReactionUsersPopupAction::PageUp,
+            });
+        }
         if let Some(action) = self.scroll_action(key) {
             return Some(ReactionUsersPopupAction::Scroll(action));
         }
 
-        match key.code {
-            KeyCode::PageDown => Some(ReactionUsersPopupAction::PageDown),
-            KeyCode::PageUp => Some(ReactionUsersPopupAction::PageUp),
-            _ => None,
-        }
+        None
     }
 
     pub(in crate::tui) fn debug_log_popup_action(&self, key: KeyEvent) -> DebugLogPopupAction {
@@ -2386,6 +2520,25 @@ impl KeyBindings {
             _ if key_set == SelectionKeySet::Navigation => self.keymap_selection_action(key),
             _ => None,
         }
+    }
+
+    pub(in crate::tui) fn popup_page_action(&self, key: KeyEvent) -> Option<SelectionAction> {
+        match key.code {
+            KeyCode::PageDown => return Some(SelectionAction::Next),
+            KeyCode::PageUp => return Some(SelectionAction::Previous),
+            _ => {}
+        }
+
+        self.keymap_single_key_shortcuts(UiAction::HalfPageDown)
+            .iter()
+            .any(|shortcut| shortcut.matches(key))
+            .then_some(SelectionAction::Next)
+            .or_else(|| {
+                self.keymap_single_key_shortcuts(UiAction::HalfPageUp)
+                    .iter()
+                    .any(|shortcut| shortcut.matches(key))
+                    .then_some(SelectionAction::Previous)
+            })
     }
 
     fn keymap_selection_action(&self, key: KeyEvent) -> Option<SelectionAction> {
@@ -3979,6 +4132,28 @@ mod tests {
             ),
             Some(KeyMapLookup::Action(UiAction::StartComposer))
         );
+    }
+
+    #[test]
+    fn keymap_summaries_include_active_direct_and_composer_bindings() {
+        let key_bindings = KeyBindings::default();
+        let summaries = key_bindings.binding_summaries();
+
+        assert!(summaries.iter().any(|summary| {
+            summary.scope == "keymap"
+                && summary.action == "StartComposer"
+                && summary.keys.iter().any(|key| key == "i")
+        }));
+        assert!(summaries.iter().any(|summary| {
+            summary.scope == "keymap.composer"
+                && summary.action == "Submit"
+                && summary.keys.iter().any(|key| key == "<Enter>")
+        }));
+        assert!(summaries.iter().any(|summary| {
+            summary.scope == "keymap"
+                && summary.action == "ToggleGuildPane"
+                && summary.keys.iter().any(|key| key == "<leader> 1")
+        }));
     }
 
     #[test]

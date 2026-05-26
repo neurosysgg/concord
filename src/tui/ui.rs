@@ -71,8 +71,9 @@ use self::panes::{
 };
 use self::panes::{render_channels, render_guilds, render_header, render_members};
 use self::popups::{
-    render_attachment_viewer, render_channel_switcher_popup, render_debug_log_popup,
-    render_emoji_reaction_picker, render_leader_popup, render_message_action_menu,
+    keymap_popup_text_area, keymap_popup_total_lines, render_attachment_viewer,
+    render_channel_switcher_popup, render_debug_log_popup, render_emoji_reaction_picker,
+    render_keymap_help_popup, render_leader_popup, render_message_action_menu,
     render_message_delete_confirmation, render_message_pin_confirmation, render_message_url_picker,
     render_options_popup, render_poll_vote_picker, render_quit_confirmation,
     render_reaction_users_popup, render_toast, render_user_profile_popup,
@@ -103,8 +104,8 @@ use self::{
         centered_viewer_preview_area, channel_switcher_cursor_position, channel_switcher_lines,
         debug_log_popup_lines, emoji_reaction_picker_lines, emoji_reaction_picker_lines_for_width,
         emoji_reaction_picker_lines_with_existing, emoji_reaction_picker_lines_with_own_reactions,
-        filtered_emoji_reaction_picker_lines, leader_action_lines_for_test,
-        message_action_menu_lines, message_delete_confirmation_lines,
+        filtered_emoji_reaction_picker_lines, keymap_help_popup_lines,
+        leader_action_lines_for_test, message_action_menu_lines, message_delete_confirmation_lines,
         message_pin_confirmation_lines, message_url_picker_lines_for_width, options_popup_lines,
         poll_vote_picker_lines, quit_confirmation_lines, reaction_users_popup_lines, toast_area,
         toast_line, user_profile_popup_lines, user_profile_popup_lines_with_activities,
@@ -155,6 +156,12 @@ pub fn sync_view_heights(area: Rect, state: &mut DashboardState) {
         let total_lines = user_profile_popup_total_lines(state, text_width);
         state.set_user_profile_popup_view_height(text_height as usize);
         state.set_user_profile_popup_total_lines(total_lines);
+    }
+    if state.is_keymap_popup_open() {
+        let inner = keymap_popup_text_area(areas.messages);
+        let total_lines = keymap_popup_total_lines(state);
+        state.set_keymap_popup_view_height(inner.height as usize);
+        state.set_keymap_popup_total_lines(total_lines);
     }
 }
 
@@ -223,6 +230,7 @@ pub fn render(
     render_reaction_users_popup(frame, areas.messages, state);
     render_attachment_viewer(frame, areas.messages, state, viewer_image_preview);
     render_debug_log_popup(frame, areas.messages, state);
+    render_keymap_help_popup(frame, areas.messages, state);
     render_toast(frame, frame.area(), state);
 }
 

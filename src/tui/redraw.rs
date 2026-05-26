@@ -190,6 +190,9 @@ struct DiagnosticsPopupSignature {
     debug_log_open: bool,
     debug_log_lines: DebugSignature,
     debug_channel_visibility: DebugSignature,
+    keymap_help_open: bool,
+    keymap_help: DebugSignature,
+    keymap_popup_scroll: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -412,6 +415,13 @@ pub(super) fn visible_dashboard_signature(state: &DashboardState) -> VisibleDash
                     } else {
                         debug_signature(&())
                     },
+                    keymap_help_open: state.is_keymap_help_popup_open(),
+                    keymap_help: if state.is_keymap_help_popup_open() {
+                        debug_signature(&state.keymap_binding_summaries())
+                    } else {
+                        debug_signature(&())
+                    },
+                    keymap_popup_scroll: state.keymap_popup_scroll(),
                 },
             },
         },

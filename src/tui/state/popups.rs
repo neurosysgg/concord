@@ -18,6 +18,11 @@ pub(super) enum LeaderMode {
     Actions,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum KeymapPopupKind {
+    Help,
+}
+
 #[derive(Debug, Default)]
 pub(super) struct PopupUiState {
     pub(super) message_action_menu: Option<MessageActionMenuState>,
@@ -35,6 +40,7 @@ pub(super) struct PopupUiState {
     pub(super) poll_vote_picker: Option<PollVotePickerState>,
     pub(super) reaction_users_popup: Option<ReactionUsersPopupState>,
     pub(super) debug_log_popup_open: bool,
+    pub(super) keymap_popup: Option<KeymapPopupState>,
     pub(super) leader_mode: Option<LeaderMode>,
     pub(super) leader_keymap_prefix: Vec<KeyChord>,
     pub(super) channel_switcher: Option<ChannelSwitcherState>,
@@ -43,6 +49,25 @@ pub(super) struct PopupUiState {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MessageActionMenuState {
     pub(super) selected: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct KeymapPopupState {
+    pub(super) kind: KeymapPopupKind,
+    pub(super) scroll: usize,
+    pub(super) view_height: usize,
+    pub(super) total_lines: usize,
+}
+
+impl KeymapPopupState {
+    pub(super) fn new(kind: KeymapPopupKind) -> Self {
+        Self {
+            kind,
+            scroll: 0,
+            view_height: 0,
+            total_lines: 0,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

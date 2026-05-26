@@ -444,7 +444,7 @@ fn message_pane_pin_shortcut_requires_confirmation() {
 }
 
 #[test]
-fn message_action_shortcuts_ignore_control_modified_keys() {
+fn message_action_menu_control_page_keys_move_selection() {
     let mut state = state_with_own_message();
     state.focus_pane(FocusPane::Messages);
     handle_key(&mut state, key(KeyCode::Enter));
@@ -453,6 +453,10 @@ fn message_action_shortcuts_ignore_control_modified_keys() {
 
     assert_eq!(command, None);
     assert!(state.is_message_action_menu_open());
+    assert_eq!(state.selected_message_action_index(), Some(10));
+
+    handle_key(&mut state, ctrl_key('u'));
+
     assert_eq!(state.selected_message_action_index(), Some(0));
 }
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::tui::keybindings::OptionsCategoryShortcut;
+use crate::tui::keybindings::{KeymapBindingSummary, OptionsCategoryShortcut};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::collections::BTreeMap;
 
@@ -1116,4 +1116,27 @@ fn debug_log_popup_wraps_long_detail_lines() {
         joined.contains("detail=Discord returned HTTP 403"),
         "expected wrapped debug popup line to preserve HTTP detail: {texts:?}"
     );
+}
+
+#[test]
+fn keymap_popup_lines_show_help_content() {
+    let help_lines = keymap_help_popup_lines(vec![
+        KeymapBindingSummary {
+            scope: "keymap",
+            action: "ReplyMessage".to_owned(),
+            keys: vec!["n".to_owned()],
+        },
+        KeymapBindingSummary {
+            scope: "keymap.composer",
+            action: "Submit".to_owned(),
+            keys: vec!["<Enter>".to_owned()],
+        },
+    ]);
+
+    assert_eq!(help_lines[0].spans[0].content, "[keymap]");
+    assert_eq!(help_lines[1].spans[0].content, "[n] ");
+    assert!(help_lines[1].spans[1].content.contains("ReplyMessage"));
+    assert_eq!(help_lines[3].spans[0].content, "[keymap.composer]");
+    assert_eq!(help_lines[4].spans[0].content, "[<Enter>] ");
+    assert!(help_lines[4].spans[1].content.contains("Submit"));
 }

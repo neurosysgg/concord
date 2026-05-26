@@ -1,7 +1,20 @@
 use crate::discord::ChannelVisibilityStats;
+use crate::tui::keybindings::{KeymapBindingSummary, SelectionAction};
 
-use super::{ActiveGuildScope, DashboardState};
+use super::{
+    ActiveGuildScope, DashboardState,
+    popups::{KeymapPopupKind, KeymapPopupState},
+};
 use crate::logging;
+
+fn clamp_keymap_popup_scroll(popup: &mut KeymapPopupState) {
+    let max_scroll = popup.total_lines.saturating_sub(popup.view_height);
+    popup.scroll = popup.scroll.min(max_scroll);
+}
+
+fn keymap_popup_half_page_distance(popup: &KeymapPopupState) -> usize {
+    (popup.view_height / 2).max(1)
+}
 
 impl DashboardState {
     pub fn update_available_version(&self) -> Option<&str> {
@@ -22,6 +35,84 @@ impl DashboardState {
 
     pub fn close_debug_log_popup(&mut self) {
         self.popups.debug_log_popup_open = false;
+    }
+
+    pub fn is_keymap_popup_open(&self) -> bool {
+        self.popups.keymap_popup.is_some()
+    }
+
+    pub fn is_keymap_help_popup_open(&self) -> bool {
+        self.popups
+            .keymap_popup
+            .as_ref()
+            .is_some_and(|popup| popup.kind == KeymapPopupKind::Help)
+    }
+
+    pub fn open_keymap_help_popup(&mut self) {
+        self.close_all_action_contexts();
+        self.close_leader();
+        self.popups.keymap_popup = Some(KeymapPopupState::new(KeymapPopupKind::Help));
+    }
+
+    pub fn close_keymap_popup(&mut self) {
+        self.popups.keymap_popup = None;
+    }
+
+    pub fn keymap_popup_scroll(&self) -> usize {
+        self.popups
+            .keymap_popup
+            .as_ref()
+            .map(|popup| popup.scroll)
+            .unwrap_or_default()
+    }
+
+    pub fn scroll_keymap_popup(&mut self, action: SelectionAction) {
+        let Some(popup) = self.popups.keymap_popup.as_mut() else {
+            return;
+        };
+        match action {
+            SelectionAction::Next => popup.scroll = popup.scroll.saturating_add(1),
+            SelectionAction::Previous => popup.scroll = popup.scroll.saturating_sub(1),
+        }
+        clamp_keymap_popup_scroll(popup);
+    }
+
+    pub fn page_keymap_popup_down(&mut self) {
+        let Some(popup) = self.popups.keymap_popup.as_mut() else {
+            return;
+        };
+        popup.scroll = popup
+            .scroll
+            .saturating_add(keymap_popup_half_page_distance(popup));
+        clamp_keymap_popup_scroll(popup);
+    }
+
+    pub fn page_keymap_popup_up(&mut self) {
+        let Some(popup) = self.popups.keymap_popup.as_mut() else {
+            return;
+        };
+        popup.scroll = popup
+            .scroll
+            .saturating_sub(keymap_popup_half_page_distance(popup));
+        clamp_keymap_popup_scroll(popup);
+    }
+
+    pub fn set_keymap_popup_view_height(&mut self, height: usize) {
+        if let Some(popup) = self.popups.keymap_popup.as_mut() {
+            popup.view_height = height;
+            clamp_keymap_popup_scroll(popup);
+        }
+    }
+
+    pub fn set_keymap_popup_total_lines(&mut self, total_lines: usize) {
+        if let Some(popup) = self.popups.keymap_popup.as_mut() {
+            popup.total_lines = total_lines;
+            clamp_keymap_popup_scroll(popup);
+        }
+    }
+
+    pub fn keymap_binding_summaries(&self) -> Vec<KeymapBindingSummary> {
+        self.options.key_bindings.binding_summaries()
     }
 
     pub fn request_open_composer_in_editor(&mut self) {

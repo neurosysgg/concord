@@ -20,6 +20,30 @@ fn quit_key_requires_confirmation() {
 }
 
 #[test]
+fn question_mark_opens_current_keymap_popup_and_scrolls_within_bounds() {
+    let mut state = DashboardState::new();
+    handle_key(&mut state, char_key('?'));
+
+    assert!(state.is_keymap_help_popup_open());
+
+    state.set_keymap_popup_view_height(4);
+    state.set_keymap_popup_total_lines(10);
+
+    for _ in 0..10 {
+        handle_key(&mut state, ctrl_key('d'));
+    }
+    assert_eq!(state.keymap_popup_scroll(), 6);
+
+    handle_key(&mut state, ctrl_key('u'));
+
+    assert_eq!(state.keymap_popup_scroll(), 4);
+
+    handle_key(&mut state, key(KeyCode::Esc));
+
+    assert!(!state.is_keymap_help_popup_open());
+}
+
+#[test]
 fn forum_blank_bottom_rows_do_not_select_hidden_posts() {
     let mut state = state_with_forum_channel_posts();
     state.push_event(AppEvent::ForumPostsLoaded {

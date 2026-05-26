@@ -457,6 +457,8 @@ sensitivity and press `h`/`l` to adjust by 1 dB or `H`/`L` to adjust by 10 dB.
 
 #### Keymap options
 
+> ⚠️ Keymap action names and default bindings may change between release.
+
 Concord reads key settings from the `[keymap]` section in `keymap.toml`.
 
 Example `keymap.toml`:

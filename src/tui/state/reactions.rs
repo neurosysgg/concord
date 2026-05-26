@@ -130,14 +130,14 @@ impl DashboardState {
 
     pub fn page_reaction_users_popup_down(&mut self) {
         if let Some(popup) = &mut self.popups.reaction_users_popup {
-            popup.scroll = popup.scroll.saturating_add(10);
+            popup.scroll = popup.scroll.saturating_add((popup.view_height / 2).max(1));
             popup.clamp_scroll();
         }
     }
 
     pub fn page_reaction_users_popup_up(&mut self) {
         if let Some(popup) = &mut self.popups.reaction_users_popup {
-            popup.scroll = popup.scroll.saturating_sub(10);
+            popup.scroll = popup.scroll.saturating_sub((popup.view_height / 2).max(1));
         }
     }
 

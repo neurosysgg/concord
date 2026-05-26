@@ -1,10 +1,7 @@
 use super::*;
 use crate::discord::AppCommand;
 
-fn message_action<'a>(
-    actions: &'a [MessageActionItem],
-    kind: MessageActionKind,
-) -> &'a MessageActionItem {
+fn message_action(actions: &[MessageActionItem], kind: MessageActionKind) -> &MessageActionItem {
     actions
         .iter()
         .find(|action| action.kind == kind)

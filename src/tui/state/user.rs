@@ -278,6 +278,19 @@ impl DashboardState {
         }
     }
 
+    pub fn page_user_profile_popup_down(&mut self) {
+        if let Some(popup) = self.popups.user_profile_popup.as_mut() {
+            popup.scroll = popup.scroll.saturating_add((popup.view_height / 2).max(1));
+            clamp_user_profile_popup_scroll(popup);
+        }
+    }
+
+    pub fn page_user_profile_popup_up(&mut self) {
+        if let Some(popup) = self.popups.user_profile_popup.as_mut() {
+            popup.scroll = popup.scroll.saturating_sub((popup.view_height / 2).max(1));
+        }
+    }
+
     pub fn members_grouped(&self) -> Vec<MemberGroup<'_>> {
         let Some(guild_id) = self.selected_guild_id() else {
             return self.selected_channel_recipient_group();

@@ -9,6 +9,7 @@ mod attachment_viewer;
 mod channel_switcher;
 mod confirmation;
 mod debug_log;
+mod keymap;
 mod options;
 mod polls;
 mod profile;
@@ -37,6 +38,11 @@ pub(super) use confirmation::{
 #[cfg(test)]
 pub(super) use debug_log::debug_log_popup_lines;
 pub(super) use debug_log::render_debug_log_popup;
+#[cfg(test)]
+pub(super) use keymap::keymap_help_popup_lines;
+pub(super) use keymap::{
+    keymap_popup_text_area, keymap_popup_total_lines, render_keymap_help_popup,
+};
 #[cfg(test)]
 pub(super) use options::options_popup_lines;
 pub(super) use options::render_options_popup;

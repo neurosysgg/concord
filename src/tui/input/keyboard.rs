@@ -9,7 +9,7 @@ use crate::tui::keybindings::{
     KeyMapLookup, LeaderActionMenuAction, MessageConfirmationAction, MessageShortcutAction,
     OptionsCategoryShortcut, OptionsPopupAction, PaneFilterAction, PollVotePickerAction,
     PopupListAction, ProfilePopupAction, ReactionUsersPopupAction, ScrollAction, SelectionAction,
-    UiAction,
+    SelectionKeySet, UiAction,
 };
 
 use super::super::state::{DashboardState, FocusPane, MessageActionKind};
@@ -18,6 +18,14 @@ use crate::discord::AppCommand;
 pub fn handle_key(state: &mut DashboardState, key: KeyEvent) -> Option<AppCommand> {
     if key.kind != KeyEventKind::Press {
         return None;
+    }
+
+    if handle_popup_page_key(state, key) {
+        return None;
+    }
+
+    if state.is_keymap_popup_open() {
+        return handle_keymap_popup_key(state, key);
     }
 
     if state.is_debug_log_popup_open() {
@@ -104,6 +112,11 @@ pub fn handle_key(state: &mut DashboardState, key: KeyEvent) -> Option<AppComman
         if let Some(command) = handle_pane_filter_key(state, key, focus) {
             return command;
         }
+    }
+
+    if is_keymap_help_key(key) {
+        state.open_keymap_help_popup();
+        return None;
     }
 
     match state.key_bindings().keymap_lookup_root_key(key) {
@@ -468,6 +481,12 @@ fn handle_message_url_picker_key(state: &mut DashboardState, key: KeyEvent) -> O
         Some(PopupListAction::Select(SelectionAction::Previous)) => {
             state.move_message_url_picker_up()
         }
+        Some(PopupListAction::Page(SelectionAction::Next)) => {
+            repeat_popup_page(|| state.move_message_url_picker_down())
+        }
+        Some(PopupListAction::Page(SelectionAction::Previous)) => {
+            repeat_popup_page(|| state.move_message_url_picker_up())
+        }
         Some(PopupListAction::ActivateSelected) => {
             return state.activate_selected_message_url();
         }
@@ -716,6 +735,12 @@ fn handle_message_action_menu_key(state: &mut DashboardState, key: KeyEvent) -> 
         Some(PopupListAction::Close) => state.close_or_back_message_action_menu(),
         Some(PopupListAction::Select(SelectionAction::Next)) => state.move_message_action_down(),
         Some(PopupListAction::Select(SelectionAction::Previous)) => state.move_message_action_up(),
+        Some(PopupListAction::Page(SelectionAction::Next)) => {
+            repeat_popup_page(|| state.move_message_action_down())
+        }
+        Some(PopupListAction::Page(SelectionAction::Previous)) => {
+            repeat_popup_page(|| state.move_message_action_up())
+        }
         Some(PopupListAction::ActivateSelected) => {
             return state.activate_selected_message_action();
         }
@@ -795,6 +820,73 @@ fn handle_user_profile_popup_key(state: &mut DashboardState, key: KeyEvent) -> O
     }
 
     None
+}
+
+fn handle_popup_page_key(state: &mut DashboardState, key: KeyEvent) -> bool {
+    let Some(action) = state.key_bindings().popup_page_action(key) else {
+        return false;
+    };
+
+    match action {
+        SelectionAction::Next => page_active_popup_down(state),
+        SelectionAction::Previous => page_active_popup_up(state),
+    }
+}
+
+fn page_active_popup_down(state: &mut DashboardState) -> bool {
+    if state.is_keymap_popup_open() {
+        state.page_keymap_popup_down();
+    } else if state.is_reaction_users_popup_open() {
+        state.page_reaction_users_popup_down();
+    } else if state.is_user_profile_popup_open() {
+        state.page_user_profile_popup_down();
+    } else if state.is_options_popup_open() {
+        repeat_popup_page(|| state.move_option_down());
+    } else if state.is_channel_switcher_open() {
+        repeat_popup_page(|| state.move_channel_switcher_down());
+    } else if state.is_poll_vote_picker_open() {
+        repeat_popup_page(|| state.move_poll_vote_picker_down());
+    } else if state.is_emoji_reaction_picker_open() {
+        repeat_popup_page(|| state.move_emoji_reaction_down());
+    } else if state.is_message_url_picker_open() {
+        repeat_popup_page(|| state.move_message_url_picker_down());
+    } else if state.is_message_action_menu_open() {
+        repeat_popup_page(|| state.move_message_action_down());
+    } else {
+        return false;
+    }
+    true
+}
+
+fn page_active_popup_up(state: &mut DashboardState) -> bool {
+    if state.is_keymap_popup_open() {
+        state.page_keymap_popup_up();
+    } else if state.is_reaction_users_popup_open() {
+        state.page_reaction_users_popup_up();
+    } else if state.is_user_profile_popup_open() {
+        state.page_user_profile_popup_up();
+    } else if state.is_options_popup_open() {
+        repeat_popup_page(|| state.move_option_up());
+    } else if state.is_channel_switcher_open() {
+        repeat_popup_page(|| state.move_channel_switcher_up());
+    } else if state.is_poll_vote_picker_open() {
+        repeat_popup_page(|| state.move_poll_vote_picker_up());
+    } else if state.is_emoji_reaction_picker_open() {
+        repeat_popup_page(|| state.move_emoji_reaction_up());
+    } else if state.is_message_url_picker_open() {
+        repeat_popup_page(|| state.move_message_url_picker_up());
+    } else if state.is_message_action_menu_open() {
+        repeat_popup_page(|| state.move_message_action_up());
+    } else {
+        return false;
+    }
+    true
+}
+
+fn repeat_popup_page(mut action: impl FnMut()) {
+    for _ in 0..10 {
+        action();
+    }
 }
 
 /// Returns `Some(command)` when the filter handler has fully handled the key
@@ -952,6 +1044,22 @@ fn handle_debug_log_popup_key(state: &mut DashboardState, key: KeyEvent) -> Opti
     None
 }
 
+fn handle_keymap_popup_key(state: &mut DashboardState, key: KeyEvent) -> Option<AppCommand> {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('q') => state.close_keymap_popup(),
+        _ => {
+            if let Some(action) = state
+                .key_bindings()
+                .selection_action(key, SelectionKeySet::Navigation)
+            {
+                state.scroll_keymap_popup(action);
+            }
+        }
+    }
+
+    None
+}
+
 fn handle_options_popup_key(state: &mut DashboardState, key: KeyEvent) -> Option<AppCommand> {
     match state
         .key_bindings()
@@ -971,6 +1079,13 @@ fn handle_options_popup_key(state: &mut DashboardState, key: KeyEvent) -> Option
     }
 
     None
+}
+
+fn is_keymap_help_key(key: KeyEvent) -> bool {
+    key.code == KeyCode::Char('?')
+        && !key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
 }
 
 fn handle_composer_key(state: &mut DashboardState, key: KeyEvent) -> Option<AppCommand> {
