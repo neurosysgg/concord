@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.3] - 2026-05-26
+
+### Bug Fixes
+
+- Enable voice playback by default by @chojs23
+
+### Documentation
+
+- Update README by @chojs23
+
 ## [2.1.2] - 2026-05-25
 
 ### Bug Fixes
