@@ -285,23 +285,3 @@ pub(in crate::tui) enum LoginBusyAction {
     Cancel,
     Ignore,
 }
-
-impl MessageActionKind {
-    pub(in crate::tui) fn ui_action(self) -> UiAction {
-        match self {
-            MessageActionKind::CopyContent => UiAction::CopyMessage,
-            MessageActionKind::OpenReactionPicker => UiAction::ReactMessage,
-            MessageActionKind::Reply => UiAction::ReplyMessage,
-            MessageActionKind::OpenDeleteConfirmation => UiAction::DeleteMessage,
-            MessageActionKind::Edit => UiAction::EditMessage,
-            MessageActionKind::OpenUrl => UiAction::OpenMessageUrl,
-            MessageActionKind::ViewAttachment => UiAction::ViewMessageAttachment,
-            MessageActionKind::ShowProfile => UiAction::ShowMessageProfile,
-            MessageActionKind::OpenPinConfirmation => UiAction::PinMessage,
-            MessageActionKind::OpenThread => UiAction::OpenThread,
-            MessageActionKind::ShowReactionUsers => UiAction::ShowReactionUsers,
-            MessageActionKind::OpenPollVotePicker => UiAction::OpenPollVotePicker,
-            MessageActionKind::GoToReferencedMessage => UiAction::GoToReferencedMessage,
-        }
-    }
-}

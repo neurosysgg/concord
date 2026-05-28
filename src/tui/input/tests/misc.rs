@@ -109,7 +109,7 @@ fn a_key_no_longer_opens_actions_directly() {
 fn esc_closes_modal_before_returning_from_opened_thread() {
     let mut state = state_with_thread_created_message();
     state.focus_pane(FocusPane::Messages);
-    handle_key(&mut state, char_key('g'));
+    handle_key(&mut state, key(KeyCode::Enter));
     handle_key(&mut state, char_key('t'));
     assert_eq!(state.selected_channel_id(), Some(Id::new(10)));
 

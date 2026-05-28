@@ -760,14 +760,34 @@ impl KeyBindings {
         actions: &[MessageActionItem],
         index: usize,
     ) -> Vec<KeyChord> {
-        keymap_action_shortcuts(index, actions.iter().map(|item| item.kind), |kind| {
-            self.keymap_single_key_shortcuts(kind.ui_action())
-        })
+        scoped_action_shortcuts(
+            index,
+            actions.iter().map(|item| item.kind),
+            &self.action_shortcuts.message,
+            |kind| self.default_message_action_shortcut(kind),
+        )
     }
 
     pub fn message_action_label(&self, action: &MessageActionItem) -> String {
-        self.keymap_action_label(action.kind.ui_action())
-            .unwrap_or_else(|| action.label.clone())
+        action_label(&self.action_shortcuts.message, action.kind, &action.label)
+    }
+
+    fn default_message_action_shortcut(&self, kind: MessageActionKind) -> Vec<KeyChord> {
+        vec![char_chord(match kind {
+            MessageActionKind::CopyContent => 'y',
+            MessageActionKind::OpenReactionPicker => 'r',
+            MessageActionKind::Reply => 'R',
+            MessageActionKind::OpenDeleteConfirmation => 'd',
+            MessageActionKind::Edit => 'e',
+            MessageActionKind::OpenUrl => 'o',
+            MessageActionKind::ViewAttachment => 'v',
+            MessageActionKind::GoToReferencedMessage => 'g',
+            MessageActionKind::ShowProfile => 'p',
+            MessageActionKind::OpenPinConfirmation => 'P',
+            MessageActionKind::OpenThread => 't',
+            MessageActionKind::ShowReactionUsers => 'u',
+            MessageActionKind::OpenPollVotePicker => 'c',
+        })]
     }
 
     pub fn message_action_shortcut_label(
@@ -779,17 +799,7 @@ impl KeyBindings {
         if !activation_shortcuts.is_empty() {
             return key_chord_list_label(&activation_shortcuts);
         }
-        actions
-            .get(index)
-            .and_then(|action| self.keymap_action_sequence_label(action.kind.ui_action()))
-            .unwrap_or_default()
-    }
-
-    fn keymap_action_label(&self, action: UiAction) -> Option<String> {
-        self.keymap
-            .specs
-            .get(&action)
-            .map(|spec| spec.label.clone())
+        String::new()
     }
 
     fn keymap_single_key_shortcuts(&self, action: UiAction) -> Vec<KeyChord> {
@@ -806,16 +816,6 @@ impl KeyBindings {
                     .collect()
             })
             .unwrap_or_default()
-    }
-
-    fn keymap_action_sequence_label(&self, action: UiAction) -> Option<String> {
-        self.keymap.specs.get(&action).map(|spec| {
-            spec.sequences
-                .iter()
-                .map(|sequence| key_chord_sequence_label(sequence))
-                .collect::<Vec<_>>()
-                .join("/")
-        })
     }
 
     pub(in crate::tui) fn matching_action_shortcut_index<A>(
@@ -974,21 +974,6 @@ fn action_shortcuts(
     Vec::new()
 }
 
-fn keymap_action_shortcuts<K>(
-    index: usize,
-    kinds: impl IntoIterator<Item = K>,
-    shortcuts: impl Fn(K) -> Vec<KeyChord>,
-) -> Vec<KeyChord>
-where
-    K: Copy,
-{
-    let shortcut_sets = kinds.into_iter().map(shortcuts).collect::<Vec<_>>();
-    if shortcut_sets.get(index).is_none() {
-        return Vec::new();
-    }
-    action_shortcuts(index, shortcut_sets)
-}
-
 fn first_unused_indexed_shortcut(used: &[KeyChord]) -> Option<KeyChord> {
     (0..10)
         .filter_map(indexed_shortcut)
@@ -1034,12 +1019,4 @@ fn key_chord_list_label(shortcuts: &[KeyChord]) -> String {
         .map(|key| key.label())
         .collect::<Vec<_>>()
         .join("/")
-}
-
-fn key_chord_sequence_label(sequence: &[KeyChord]) -> String {
-    sequence
-        .iter()
-        .map(|key| key.label())
-        .collect::<Vec<_>>()
-        .join(" ")
 }

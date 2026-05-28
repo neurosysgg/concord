@@ -172,8 +172,8 @@ Tokens are saved under Concord's config directory in plain text. See the Securit
 - View full message history with pagination
 - Rich content display (embeds, attachments, stickers, and mentions)
 - Detect URLs in message bodies and markdown links, then open them in your default browser
-- Direct message shortcuts for copy, reply, edit, delete, pin/unpin, reactions,
-  image viewing, and profile lookup
+- Direct message shortcuts for copy, reply, edit, delete, reactions, URL opening,
+  and image viewing. More message actions are available from the action menu.
 
 #### Markdown Rendering
 
@@ -284,7 +284,7 @@ Press `Space` to open the leader shortcut window.
 
 Focus a pane, then press `Space`, `a` to open actions for that pane. Action
 shortcuts are shown inside the leader popup and only run when the action is
-enabled. In the Messages pane, the selected message also supports direct
+enabled. In the Messages pane, the selected message also supports these direct
 shortcuts:
 
 Message shortcuts:
@@ -298,7 +298,24 @@ Message shortcuts:
 | `e`      | Edit                | Start editing the selected message when editing is allowed  |
 | `o`      | Open URL            | Open the selected message URL, or choose from multiple URLs |
 | `v`      | View attachment     | Open the selected message's attachment viewer               |
-| `P`      | Pin / unpin         | Open a pin or unpin confirmation for the selected message   |
+
+Message action menu shortcuts:
+
+| Shortcut | Action                      | Description                                                 |
+| -------- | --------------------------- | ----------------------------------------------------------- |
+| `y`      | Copy                        | Copy the selected message text and show a short toast       |
+| `r`      | Add/remove reaction         | Open the reaction picker for the selected message           |
+| `R`      | Reply                       | Start a reply to the selected message                       |
+| `d`      | Delete                      | Open a delete confirmation before deleting the message      |
+| `e`      | Edit                        | Start editing the selected message when editing is allowed  |
+| `o`      | Open URL                    | Open the selected message URL, or choose from multiple URLs |
+| `v`      | View attachment             | Open the selected message's attachment viewer               |
+| `g`      | Go to referenced message    | Go to the replied or forwarded message                      |
+| `p`      | show message sender profile | Open the selected message author's profile                  |
+| `P`      | Pin / unpin                 | Open a pin or unpin confirmation for the selected message   |
+| `t`      | Open thread                 | Open the selected message's thread                          |
+| `u`      | Show reacted users          | Show users who reacted to the selected message              |
+| `c`      | Choose poll votes           | Choose poll votes for the selected message                  |
 
 If a message contains more than one detected URL, `o` opens a numbered URL picker inside the leader popup so you can choose which link to open.
 
@@ -328,18 +345,6 @@ Voice commands:
 | `Space`, `v`, `d` | Deafen voice | Toggle Concord's Discord voice deaf state |
 | `Space`, `v`, `m` | Mute voice   | Toggle Concord's Discord voice mute state |
 | `Space`, `v`, `l` | Leave voice  | Leave the current Concord voice channel   |
-
-`g` prefix commands:
-
-| Sequence | Action                                         |
-| -------- | ---------------------------------------------- |
-| `g`, `g` | Jump to the top                                |
-| `g`, `d` | Go to the replied or forwarded message         |
-| `g`, `p` | Open the selected message author's profile     |
-| `g`, `t` | Open the selected message's thread             |
-| `g`, `u` | Show users who reacted to the selected message |
-| `g`, `v` | Choose poll votes for the selected message     |
-| `g`, `p` | Show selected message sender profile           |
 
 When the attachment viewer is open, press `d` to download the current attachment directly.
 
@@ -482,7 +487,6 @@ Example `keymap.toml`:
 [keymap]
 StartComposer = { keys = ["c"] }
 ReplyMessage = "<leader>mr"
-OpenThread = { keys = ["gt"], description = "open thread" }
 VoiceDeafen = "<leader>vd"
 VoiceMute = "<leader>vm"
 VoiceLeave = "<leader>vl"
@@ -496,20 +500,24 @@ LeaveServer = { keys = ["l"], description = "leave server" }
 [keymap.channel_actions]
 MuteChannel = { keys = ["x"], description = "mute channel" }
 
+[keymap.message_actions]
+OpenThread = { keys = ["t"], description = "open thread" }
+GoToReferencedMessage = "g"
+
 [keymap.composer]
 OpenEditor = "<C-o>"
 DeletePreviousWord = "<A-backspace>"
 ```
 
-There are five kinds of keymap settings:
+There are six kinds of keymap settings:
 
-| Config path                                                                     | What it controls                                                                          |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `[keymap] leader`                                                               | The key that opens the leader popup. Defaults to `Space`.                                 |
-| `[keymap] <ActionName>`                                                         | Directly assignable UI actions such as `StartComposer`, `ReplyMessage`, and `OpenThread`. |
-| `[keymap.groups]`                                                               | Optional titles for prefix popups, such as naming `<leader>v` as `Voice`.                 |
-| `[keymap.guild_actions]`, `[keymap.channel_actions]`, `[keymap.member_actions]` | Shortcuts shown inside focused-pane action menus opened by `OpenFocusedPaneAction`.       |
-| `[keymap.composer]`                                                             | Shortcuts used while the message composer is open, such as editor and cursor commands.    |
+| Config path                                                                                                 | What it controls                                                                          |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `[keymap] leader`                                                                                           | The key that opens the leader popup. Defaults to `Space`.                                 |
+| `[keymap] <ActionName>`                                                                                     | Directly assignable UI actions such as `StartComposer`, `ReplyMessage`, and `OpenThread`. |
+| `[keymap.groups]`                                                                                           | Optional titles for prefix popups, such as naming `<leader>v` as `Voice`.                 |
+| `[keymap.guild_actions]`, `[keymap.channel_actions]`, `[keymap.message_actions]`, `[keymap.member_actions]` | Shortcuts shown inside focused-pane action menus opened by `OpenFocusedPaneAction`.       |
+| `[keymap.composer]`                                                                                         | Shortcuts used while the message composer is open, such as editor and cursor commands.    |
 
 `[keymap]` action values can be either a string or an object with `keys` and an
 optional `description`:
@@ -530,6 +538,9 @@ the action after `d`.
 ```toml
 [keymap.channel_actions]
 MuteChannel = { keys = ["u", "<C-u>"], description = "mute channel" }
+
+[keymap.message_actions]
+GoToReferencedMessage = { keys = ["g"], description = "go to referenced message" }
 ```
 
 Composer action values under `[keymap.composer]` use the same string or object
@@ -593,12 +604,12 @@ Message actions:
 | `EditMessage`           | `"e"`          | Start editing the selected message.             |
 | `OpenMessageUrl`        | `"o"`          | Open the selected message URL.                  |
 | `ViewMessageAttachment` | `"v"`          | Open the selected message attachment viewer.    |
-| `GoToReferencedMessage` | `"gd"`         | Go to the replied or forwarded message.         |
-| `ShowMessageProfile`    | `"gp"`         | Open the selected message author's profile.     |
-| `PinMessage`            | `"P"`          | Open pin or unpin confirmation.                 |
-| `OpenThread`            | `"gt"`         | Open the selected message's thread.             |
-| `ShowReactionUsers`     | `"gu"`         | Show users who reacted to the selected message. |
-| `OpenPollVotePicker`    | `"gv"`         | Choose poll votes for the selected message.     |
+| `GoToReferencedMessage` | none           | Go to the replied or forwarded message.         |
+| `ShowMessageProfile`    | none           | Open the selected message author's profile.     |
+| `PinMessage`            | none           | Open pin or unpin confirmation.                 |
+| `OpenThread`            | none           | Open the selected message's thread.             |
+| `ShowReactionUsers`     | none           | Show users who reacted to the selected message. |
+| `OpenPollVotePicker`    | none           | Choose poll votes for the selected message.     |
 
 Pane, options, and voice actions:
 
@@ -646,11 +657,9 @@ but that key will run the composer action instead of inserting text.
 ##### Focused pane actions
 
 `OpenFocusedPaneAction` opens the action menu for the pane that currently has
-focus. Server, channel, and member pane actions can be configured in scoped
-tables. The message action menu lists the direct message actions from
-`[keymap]`, including any configured key overrides. Focused-pane action menus
-keep their actions visible, and actions that do not apply to the current
-selection are shown dimmed and disabled.
+focus. Server, channel, message, and member pane actions can be configured in
+scoped tables. Focused-pane action menus keep their actions visible, and actions
+that do not apply to the current selection are shown dimmed and disabled.
 
 Server pane actions:
 
@@ -699,15 +708,51 @@ ShowProfile = { keys = ["p"], description = "show profile" }
 | ------------- | ------- | ----------------------------------- |
 | `ShowProfile` | `p`     | Open the selected member's profile. |
 
-The messages pane action menu uses the message actions listed under directly
-assignable actions. For example, if `ReplyMessage = "n"` is configured under
-`[keymap]`, the message action menu shows `n` for reply.
+Message pane actions:
+
+```toml
+[keymap.message_actions]
+CopyMessage = "y"
+ReactMessage = "r"
+ReplyMessage = "R"
+DeleteMessage = "d"
+EditMessage = "e"
+OpenMessageUrl = "o"
+ViewMessageAttachment = "v"
+GoToReferencedMessage = "g"
+ShowMessageProfile = "p"
+PinMessage = "P"
+OpenThread = "t"
+ShowReactionUsers = "u"
+OpenPollVotePicker = "c"
+```
+
+| Scoped action           | Default | Action                                          |
+| ----------------------- | ------- | ----------------------------------------------- |
+| `CopyMessage`           | `y`     | Copy selected message content.                  |
+| `ReactMessage`          | `r`     | Add or remove a reaction.                       |
+| `ReplyMessage`          | `R`     | Start a reply.                                  |
+| `DeleteMessage`         | `d`     | Open delete confirmation.                       |
+| `EditMessage`           | `e`     | Start editing the selected message.             |
+| `OpenMessageUrl`        | `o`     | Open the selected message URL.                  |
+| `ViewMessageAttachment` | `v`     | Open the selected message attachment viewer.    |
+| `GoToReferencedMessage` | `g`     | Go to the replied or forwarded message.         |
+| `ShowMessageProfile`    | `p`     | Open the selected message author's profile.     |
+| `PinMessage`            | `P`     | Open pin or unpin confirmation.                 |
+| `OpenThread`            | `t`     | Open the selected message's thread.             |
+| `ShowReactionUsers`     | `u`     | Show users who reacted to the selected message. |
+| `OpenPollVotePicker`    | `c`     | Choose poll votes for the selected message.     |
+
+Direct `[keymap]` message action bindings are separate. For example,
+`GoToReferencedMessage = "gd"` under `[keymap]` makes `gd` work directly from the
+Messages pane, while `[keymap.message_actions] GoToReferencedMessage = "g"`
+controls the action menu shortcut.
 
 Scoped action `description` changes the label shown in server, channel, and
-member action menus. Multiple configured `keys` work as aliases when they are
-unique in the current action menu, and the popup shows them together, such as
-`[x/u]`. If two actions in the same menu use the same configured key, that key
-is ignored for both actions. If
+message, and member action menus. Multiple configured `keys` work as aliases
+when they are unique in the current action menu, and the popup shows them
+together, such as `[x/u]`. If two actions in the same menu use the same
+configured key, that key is ignored for both actions. If
 an action has no unique configured key, it falls back to `1` through `9`, then
 `0`.
 
@@ -745,12 +790,6 @@ DeleteMessage = "d"
 EditMessage = "e"
 OpenMessageUrl = "o"
 ViewMessageAttachment = "v"
-GoToReferencedMessage = "gd"
-ShowMessageProfile = "gp"
-PinMessage = "P"
-OpenThread = "gt"
-ShowReactionUsers = "gu"
-OpenPollVotePicker = "gv"
 ToggleGuildPane = "<leader>1"
 ToggleChannelPane = "<leader>2"
 ToggleMemberPane = "<leader>4"
@@ -776,6 +815,21 @@ ShowPinnedMessages = "p"
 ShowThreads = "t"
 MarkAsRead = "m"
 MuteChannel = "u"
+
+[keymap.message_actions]
+CopyMessage = "y"
+ReactMessage = "r"
+ReplyMessage = "R"
+DeleteMessage = "d"
+EditMessage = "e"
+OpenMessageUrl = "o"
+ViewMessageAttachment = "v"
+GoToReferencedMessage = "g"
+ShowMessageProfile = "p"
+PinMessage = "P"
+OpenThread = "t"
+ShowReactionUsers = "u"
+OpenPollVotePicker = "c"
 
 [keymap.member_actions]
 ShowProfile = "p"

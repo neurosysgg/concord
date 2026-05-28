@@ -204,7 +204,7 @@ fn message_action_menu_selection_aliases_move_disabled_selection() {
 fn esc_returns_from_message_opened_thread() {
     let mut state = state_with_thread_created_message();
     state.focus_pane(FocusPane::Messages);
-    handle_key(&mut state, char_key('g'));
+    handle_key(&mut state, key(KeyCode::Enter));
     handle_key(&mut state, char_key('t'));
     assert_eq!(state.selected_channel_id(), Some(Id::new(10)));
 
@@ -311,7 +311,7 @@ fn message_pane_shortcuts_reuse_message_actions() {
 }
 
 #[test]
-fn direct_message_shortcuts_work_from_message_pane() {
+fn message_pane_default_shortcuts_work_from_message_pane() {
     let mut reaction_state = state_with_messages(1);
     reaction_state.focus_pane(FocusPane::Messages);
     handle_key(&mut reaction_state, char_key('r'));
@@ -327,6 +327,7 @@ fn direct_message_shortcuts_work_from_message_pane() {
 
     let mut pin_state = state_with_messages(1);
     pin_state.focus_pane(FocusPane::Messages);
+    handle_key(&mut pin_state, key(KeyCode::Enter));
     let command = handle_key(&mut pin_state, char_key('P'));
     assert_eq!(command, None);
     assert!(
@@ -437,7 +438,7 @@ fn message_pane_profile_shortcut_opens_author_profile() {
     let mut state = state_with_messages(1);
     state.focus_pane(FocusPane::Messages);
 
-    handle_key(&mut state, char_key('g'));
+    handle_key(&mut state, key(KeyCode::Enter));
     let command = handle_key(&mut state, char_key('p'));
 
     assert_eq!(
@@ -466,8 +467,8 @@ fn goto_referenced_message_shortcut_merges_target_window_into_normal_messages() 
     }));
     state.focus_pane(FocusPane::Messages);
 
-    handle_key(&mut state, char_key('g'));
-    let command = handle_key(&mut state, char_key('d'));
+    handle_key(&mut state, key(KeyCode::Enter));
+    let command = handle_key(&mut state, char_key('g'));
 
     assert_eq!(
         command,
@@ -536,8 +537,8 @@ fn goto_referenced_message_shortcut_noops_for_unknown_forward_channel() {
     }));
     state.focus_pane(FocusPane::Messages);
 
-    handle_key(&mut state, char_key('g'));
-    let command = handle_key(&mut state, char_key('d'));
+    handle_key(&mut state, key(KeyCode::Enter));
+    let command = handle_key(&mut state, char_key('g'));
 
     assert_eq!(command, None);
     assert_eq!(state.selected_channel_id(), Some(Id::new(2)));
@@ -548,6 +549,7 @@ fn message_pane_pin_shortcut_requires_confirmation() {
     let mut state = state_with_messages(1);
     state.focus_pane(FocusPane::Messages);
 
+    handle_key(&mut state, key(KeyCode::Enter));
     let command = handle_key(&mut state, char_key('P'));
 
     assert_eq!(command, None);
@@ -562,6 +564,7 @@ fn message_pane_pin_shortcut_requires_confirmation() {
             .is_active_modal_popup(crate::tui::state::ActiveModalPopupKind::MessagePinConfirmation)
     );
 
+    handle_key(&mut state, key(KeyCode::Enter));
     handle_key(&mut state, char_key('P'));
     let command = handle_key(&mut state, key(KeyCode::Enter));
 
@@ -721,8 +724,8 @@ fn reaction_users_popup_is_modal_and_escape_closes_it() {
 fn poll_picker_number_shortcut_toggles_answer() {
     let mut state = state_with_multiselect_poll();
     state.focus_pane(FocusPane::Messages);
-    handle_key(&mut state, char_key('g'));
-    handle_key(&mut state, char_key('v'));
+    handle_key(&mut state, key(KeyCode::Enter));
+    handle_key(&mut state, char_key('c'));
 
     handle_key(&mut state, char_key('2'));
     let command = handle_key(&mut state, key(KeyCode::Enter));
@@ -741,8 +744,8 @@ fn poll_picker_number_shortcut_toggles_answer() {
 fn poll_picker_selection_aliases_move_selection() {
     let mut state = state_with_multiselect_poll();
     state.focus_pane(FocusPane::Messages);
-    handle_key(&mut state, char_key('g'));
-    handle_key(&mut state, char_key('v'));
+    handle_key(&mut state, key(KeyCode::Enter));
+    handle_key(&mut state, char_key('c'));
 
     assert!(state.is_active_modal_popup(crate::tui::state::ActiveModalPopupKind::PollVotePicker));
 

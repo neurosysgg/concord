@@ -345,9 +345,9 @@ fn message_action_menu_marks_selected_and_disabled_actions() {
     assert_eq!(
         line_texts_from_ratatui(&lines),
         vec![
-            "  [1] open thread",
-            "› [2] show reacted users (unavailable)",
-            "  [3] choose poll votes",
+            "  [t] Open thread",
+            "› [u] Show reacted users (unavailable)",
+            "  [c] Choose poll votes",
         ]
     );
 }
@@ -369,7 +369,7 @@ fn message_action_menu_uses_numbered_shortcuts_for_duplicate_preferred_keys() {
 
     assert_eq!(
         line_texts_from_ratatui(&lines),
-        vec!["› [1] show reacted users", "  [2] show reacted users"]
+        vec!["› [1] Show cat users", "  [2] Show dog users"]
     );
 }
 

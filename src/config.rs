@@ -50,6 +50,7 @@ pub struct KeymapOptions {
     pub groups: BTreeMap<String, String>,
     pub guild_actions: BTreeMap<String, KeymapBinding>,
     pub channel_actions: BTreeMap<String, KeymapBinding>,
+    pub message_actions: BTreeMap<String, KeymapBinding>,
     pub member_actions: BTreeMap<String, KeymapBinding>,
     pub composer: BTreeMap<String, KeymapBinding>,
     #[serde(flatten)]
@@ -613,6 +614,11 @@ mod tests {
             keymap.groups.get("<C-w>").map(String::as_str),
             Some("Window")
         );
+        assert!(keymap.guild_actions.is_empty());
+        assert!(keymap.channel_actions.is_empty());
+        assert!(keymap.message_actions.is_empty());
+        assert!(keymap.member_actions.is_empty());
+        assert!(keymap.composer.is_empty());
     }
 
     #[test]
@@ -665,7 +671,7 @@ mod tests {
     #[test]
     fn keymap_options_parse_scoped_action_bindings() {
         let keymap = parse_keymap_options(
-            "[keymap.guild_actions]\nMuteServer = { keys = [\"m\"], description = \"mute server\" }\n\n[keymap.channel_actions]\nMuteChannel = \"x\"\n\n[keymap.member_actions]\nShowProfile = \"p\"\n\n[keymap.composer]\nOpenEditor = \"<C-o>\"\nDeletePreviousWord = { keys = [\"<A-backspace>\"], description = \"delete word\" }\n",
+            "[keymap.guild_actions]\nMuteServer = { keys = [\"m\"], description = \"mute server\" }\n\n[keymap.channel_actions]\nMuteChannel = \"x\"\n\n[keymap.message_actions]\nGoToReferencedMessage = { keys = [\"g\"], description = \"go to referenced message\" }\n\n[keymap.member_actions]\nShowProfile = \"p\"\n\n[keymap.composer]\nOpenEditor = \"<C-o>\"\nDeletePreviousWord = { keys = [\"<A-backspace>\"], description = \"delete word\" }\n",
         );
 
         assert_eq!(
@@ -682,6 +688,13 @@ mod tests {
         assert_eq!(
             keymap.member_actions.get("ShowProfile"),
             Some(&crate::config::KeymapBinding::one("p"))
+        );
+        assert_eq!(
+            keymap.message_actions.get("GoToReferencedMessage"),
+            Some(&crate::config::KeymapBinding {
+                keys: vec!["g".to_owned()],
+                description: Some("go to referenced message".to_owned()),
+            })
         );
         assert_eq!(
             keymap.composer.get("OpenEditor"),

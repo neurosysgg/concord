@@ -79,6 +79,7 @@ struct KeyMapActionSpec {
 struct ActionShortcutBindings {
     guild: Vec<ActionShortcutBinding<GuildActionKind>>,
     channel: Vec<ActionShortcutBinding<ChannelActionKind>>,
+    message: Vec<ActionShortcutBinding<MessageActionKind>>,
     member: Vec<ActionShortcutBinding<MemberActionKind>>,
 }
 
@@ -144,6 +145,10 @@ impl ActionShortcutBindings {
                 &options.channel_actions,
                 ChannelActionKind::from_keymap_name,
             ),
+            message: parse_action_scope_lossy(
+                &options.message_actions,
+                MessageActionKind::from_keymap_name,
+            ),
             member: parse_action_scope_lossy(
                 &options.member_actions,
                 MemberActionKind::from_keymap_name,
@@ -164,6 +169,11 @@ impl ActionShortcutBindings {
                 &options.channel_actions,
                 ChannelActionKind::from_keymap_name,
             )?,
+            message: parse_action_scope(
+                "keymap.message_actions",
+                &options.message_actions,
+                MessageActionKind::from_keymap_name,
+            )?,
             member: parse_action_scope(
                 "keymap.member_actions",
                 &options.member_actions,
@@ -181,6 +191,11 @@ impl ActionShortcutBindings {
         }));
         summaries.extend(self.channel.iter().map(|binding| KeymapBindingSummary {
             scope: "keymap.channel_actions",
+            action: binding.kind.name().to_owned(),
+            keys: key_labels(&binding.shortcuts),
+        }));
+        summaries.extend(self.message.iter().map(|binding| KeymapBindingSummary {
+            scope: "keymap.message_actions",
             action: binding.kind.name().to_owned(),
             keys: key_labels(&binding.shortcuts),
         }));
@@ -808,6 +823,45 @@ impl MemberActionKind {
     }
 }
 
+impl MessageActionKind {
+    fn from_keymap_name(name: &str) -> Option<Self> {
+        match name {
+            "CopyMessage" => Some(Self::CopyContent),
+            "ReactMessage" => Some(Self::OpenReactionPicker),
+            "ReplyMessage" => Some(Self::Reply),
+            "DeleteMessage" => Some(Self::OpenDeleteConfirmation),
+            "EditMessage" => Some(Self::Edit),
+            "OpenMessageUrl" => Some(Self::OpenUrl),
+            "ViewMessageAttachment" => Some(Self::ViewAttachment),
+            "ShowMessageProfile" => Some(Self::ShowProfile),
+            "PinMessage" => Some(Self::OpenPinConfirmation),
+            "OpenThread" => Some(Self::OpenThread),
+            "ShowReactionUsers" => Some(Self::ShowReactionUsers),
+            "OpenPollVotePicker" => Some(Self::OpenPollVotePicker),
+            "GoToReferencedMessage" => Some(Self::GoToReferencedMessage),
+            _ => None,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::CopyContent => "CopyMessage",
+            Self::OpenReactionPicker => "ReactMessage",
+            Self::Reply => "ReplyMessage",
+            Self::OpenDeleteConfirmation => "DeleteMessage",
+            Self::Edit => "EditMessage",
+            Self::OpenUrl => "OpenMessageUrl",
+            Self::ViewAttachment => "ViewMessageAttachment",
+            Self::ShowProfile => "ShowMessageProfile",
+            Self::OpenPinConfirmation => "PinMessage",
+            Self::OpenThread => "OpenThread",
+            Self::ShowReactionUsers => "ShowReactionUsers",
+            Self::OpenPollVotePicker => "OpenPollVotePicker",
+            Self::GoToReferencedMessage => "GoToReferencedMessage",
+        }
+    }
+}
+
 fn all_ui_actions() -> &'static [UiAction] {
     &[
         UiAction::StartComposer,
@@ -918,12 +972,12 @@ fn default_keymap_specs(leader: KeyChord) -> BTreeMap<UiAction, KeyMapActionSpec
             UiAction::EditMessage => vec![vec![char_chord('e')]],
             UiAction::OpenMessageUrl => vec![vec![char_chord('o')]],
             UiAction::ViewMessageAttachment => vec![vec![char_chord('v')]],
-            UiAction::ShowMessageProfile => vec![vec![char_chord('g'), char_chord('p')]],
-            UiAction::PinMessage => vec![vec![char_chord('P')]],
-            UiAction::OpenThread => vec![vec![char_chord('g'), char_chord('t')]],
-            UiAction::ShowReactionUsers => vec![vec![char_chord('g'), char_chord('u')]],
-            UiAction::OpenPollVotePicker => vec![vec![char_chord('g'), char_chord('v')]],
-            UiAction::GoToReferencedMessage => vec![vec![char_chord('g'), char_chord('d')]],
+            UiAction::ShowMessageProfile
+            | UiAction::PinMessage
+            | UiAction::OpenThread
+            | UiAction::ShowReactionUsers
+            | UiAction::OpenPollVotePicker
+            | UiAction::GoToReferencedMessage => Vec::new(),
             UiAction::ToggleGuildPane => vec![vec![leader, char_chord('1')]],
             UiAction::ToggleChannelPane => vec![vec![leader, char_chord('2')]],
             UiAction::ToggleMemberPane => vec![vec![leader, char_chord('4')]],
@@ -1215,37 +1269,17 @@ mod tests {
         assert!(
             children
                 .iter()
-                .any(|item| item.key == "p" && item.label == "show message sender profile")
-        );
-        assert!(
-            children
-                .iter()
-                .any(|item| item.key == "t" && item.label == "open thread")
-        );
-        assert!(
-            children
-                .iter()
-                .any(|item| item.key == "u" && item.label == "show reacted users")
-        );
-        assert!(
-            children
-                .iter()
-                .any(|item| item.key == "v" && item.label == "choose poll votes")
-        );
-        assert!(
-            children
-                .iter()
-                .any(|item| item.key == "d" && item.label == "go to referenced message")
+                .any(|item| item.key == "g" && item.label == "jump top")
         );
 
-        for legacy_key in ['p', 't', 'u', 'c'] {
+        for menu_only_key in ['p', 't', 'u', 'c', 'P'] {
             assert_eq!(
                 key_bindings.keymap_lookup_direct_key(KeyEvent::new(
-                    KeyCode::Char(legacy_key),
+                    KeyCode::Char(menu_only_key),
                     KeyModifiers::NONE
                 )),
                 None,
-                "{legacy_key} should not keep a legacy direct message action binding"
+                "{menu_only_key} should not be a default direct message action binding"
             );
         }
     }
@@ -1263,6 +1297,9 @@ mod tests {
             .into_iter()
             .collect(),
             channel_actions: [("MuteChannel".to_owned(), KeymapBinding::one("x"))]
+                .into_iter()
+                .collect(),
+            message_actions: [("GoToReferencedMessage".to_owned(), KeymapBinding::one("g"))]
                 .into_iter()
                 .collect(),
             member_actions: [("ShowProfile".to_owned(), KeymapBinding::one("s"))]
@@ -1297,6 +1334,16 @@ mod tests {
             char_chords(&['x'])
         );
 
+        let message_actions = [MessageActionItem {
+            kind: MessageActionKind::GoToReferencedMessage,
+            label: "Go to referenced message".to_owned(),
+            enabled: true,
+        }];
+        assert_eq!(
+            key_bindings.message_action_shortcuts(&message_actions, 0),
+            char_chords(&['g'])
+        );
+
         let member_actions = [MemberActionItem {
             kind: MemberActionKind::ShowProfile,
             label: "Show profile".to_owned(),
@@ -1309,17 +1356,23 @@ mod tests {
     }
 
     #[test]
-    fn message_action_menu_shortcuts_follow_direct_keymap_overrides() {
+    fn message_action_menu_shortcuts_follow_message_action_scope() {
         let keymap = KeymapOptions {
             mappings: [
                 ("ReplyMessage".to_owned(), KeymapBinding::one("n")),
+                ("OpenThread".to_owned(), KeymapBinding::one("gt")),
+            ]
+            .into_iter()
+            .collect(),
+            message_actions: [
                 (
-                    "OpenThread".to_owned(),
+                    "ReplyMessage".to_owned(),
                     KeymapBinding {
-                        keys: vec!["T".to_owned()],
-                        description: Some("open message thread".to_owned()),
+                        keys: vec!["m".to_owned()],
+                        description: Some("reply from menu".to_owned()),
                     },
                 ),
+                ("OpenThread".to_owned(), KeymapBinding::one("T")),
             ]
             .into_iter()
             .collect(),
@@ -1333,8 +1386,11 @@ mod tests {
             enabled: true,
         }];
 
-        assert_eq!(key_bindings.message_action_shortcut_label(&actions, 0), "n");
-        assert_eq!(key_bindings.message_action_label(&actions[0]), "reply");
+        assert_eq!(key_bindings.message_action_shortcut_label(&actions, 0), "m");
+        assert_eq!(
+            key_bindings.message_action_label(&actions[0]),
+            "reply from menu"
+        );
         assert_eq!(
             key_bindings
                 .keymap_lookup_direct_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)),
@@ -1349,9 +1405,23 @@ mod tests {
             key_bindings.message_action_shortcuts(&thread_actions, 0),
             char_chords(&['T'])
         );
+        let direct_thread_prefix = [KeyChord::from_str("g").expect("g should parse")];
+        assert_eq!(
+            key_bindings.keymap_lookup_with_key(
+                &direct_thread_prefix,
+                KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE)
+            ),
+            Some(KeyMapLookup::Action(UiAction::OpenThread))
+        );
+        assert_eq!(
+            key_bindings.dashboard_action_for_ui_action(UiAction::OpenThread, FocusPane::Messages),
+            Some(DashboardAction::MessageShortcut(
+                MessageActionKind::OpenThread
+            ))
+        );
         assert_eq!(
             key_bindings.message_action_label(&thread_actions[0]),
-            "open message thread"
+            "open thread"
         );
     }
 
