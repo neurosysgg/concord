@@ -235,6 +235,8 @@ You can toggle image viewing on or off in the configuration file. When image vie
 
 ### Navigation & Keyboard shortcuts
 
+> ⚠️ Keymap action names and default bindings may have breaking changes between releases.
+
 All default key settings in this section can be customized. See
 [Keymap options](#keymap-options) for the config format and supported actions.
 
@@ -459,7 +461,7 @@ sensitivity and press `h`/`l` to adjust by 1 dB or `H`/`L` to adjust by 10 dB.
 
 #### Keymap options
 
-> ⚠️ Keymap action names and default bindings may change between release.
+> ⚠️ Keymap action names and default bindings may have breaking changes between releases.
 
 Concord reads key settings from the `[keymap]` section in `keymap.toml`.
 
