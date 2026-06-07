@@ -65,19 +65,19 @@ brew install opus pkg-config
 ```
 
 ```sh
-cargo install concord
+cargo install concord --locked
 ```
 
 To install without local voice playback and microphone support:
 
 ```sh
-cargo install concord --no-default-features
+cargo install concord --locked --no-default-features
 ```
 
 To install the latest unreleased version directly from the Git repository:
 
 ```sh
-cargo install --git https://github.com/chojs23/concord
+cargo install --locked --git https://github.com/chojs23/concord
 ```
 
 ### Nix

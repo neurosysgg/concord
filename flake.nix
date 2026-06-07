@@ -33,7 +33,7 @@
 
           src = craneLib.cleanCargoSource ./.;
 
-          cargoExtraArgs = "--features voice-playback";
+          cargoExtraArgs = "--locked --features voice-playback";
 
           # audiopus_sys and ALSA use pkg-config to find system libraries.
           # Providing Opus here avoids falling back to bundled Opus CMake
