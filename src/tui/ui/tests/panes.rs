@@ -547,16 +547,16 @@ fn channel_pane_shows_voice_participants_under_voice_channel() {
         channel_rows.join("\n")
     );
     assert!(
-        channel_rows.iter().any(|row| row.contains("LIVE")),
+        channel_rows.iter().any(|row| row.contains("🔴")),
         "{}",
         channel_rows.join("\n")
     );
     assert!(
         channel_rows.iter().any(|row| row.contains("Alice")
-            && row.contains("LIVE")
+            && row.contains("🔴")
             && row.contains("🔇")
             && row.contains("🎧")
-            && row.find("LIVE") < row.find("🔇")
+            && row.find("🔴") < row.find("🔇")
             && row.find("🔇") < row.find("🎧")),
         "{}",
         channel_rows.join("\n")
@@ -618,6 +618,72 @@ fn channel_pane_shows_voice_participants_under_voice_channel() {
         .find(|col| buffer[(*col, lobby_row)].symbol() == "🔊")
         .expect("populated voice row should keep loud speaker icon");
     assert_eq!(buffer[(lobby_icon_col, lobby_row)].fg, Color::Cyan);
+}
+
+#[test]
+fn channel_pane_keeps_voice_participant_indicators_visible_after_name_truncation() {
+    let guild_id = Id::new(1);
+    let voice_id = Id::new(10);
+    let alice = Id::new(20);
+    let mut state = DashboardState::new();
+    state.push_event(AppEvent::GuildCreate {
+        guild_id,
+        name: "guild".to_owned(),
+        member_count: None,
+        channels: vec![ChannelInfo {
+            guild_id: Some(guild_id),
+            position: Some(0),
+            name: "Lobby".to_owned(),
+            ..ChannelInfo::test(voice_id, "GuildVoice")
+        }],
+        members: vec![MemberInfo {
+            username: Some("some_really_long_voice_participant_name".to_owned()),
+            display_name: "some_really_long_voice_participant_name".to_owned(),
+            ..MemberInfo::test(alice, "some_really_long_voice_participant_name")
+        }],
+        presences: Vec::new(),
+        roles: Vec::new(),
+        emojis: Vec::new(),
+        owner_id: None,
+    });
+    state.push_event(AppEvent::VoiceStateUpdate {
+        state: VoiceStateInfo {
+            deaf: true,
+            mute: true,
+            self_stream: true,
+            ..VoiceStateInfo::test(guild_id, Some(voice_id), alice)
+        },
+    });
+    state.confirm_selected_guild();
+    state.set_channel_view_height(4);
+
+    let backend = TestBackend::new(32, 5);
+    let mut terminal = Terminal::new(backend).expect("test terminal should build");
+    terminal
+        .draw(|frame| render_channels(frame, frame.area(), &state))
+        .expect("draw should succeed");
+
+    let buffer = terminal.backend().buffer();
+    let channel_rows = (0..buffer.area.height)
+        .map(|row| {
+            (0..buffer.area.width)
+                .map(|col| buffer[(col, row)].symbol().to_owned())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>();
+    let participant_row = channel_rows
+        .iter()
+        .find(|row| row.contains("🔴") || row.contains("🔇") || row.contains("🎧"))
+        .expect("participant row should keep voice indicators visible");
+
+    assert!(participant_row.contains("..."), "{participant_row}");
+    assert!(participant_row.contains("🔴"), "{participant_row}");
+    assert!(participant_row.contains("🔇"), "{participant_row}");
+    assert!(participant_row.contains("🎧"), "{participant_row}");
+    assert!(
+        !participant_row.contains("participant_name"),
+        "{participant_row}"
+    );
 }
 
 #[test]

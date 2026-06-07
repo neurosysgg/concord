@@ -220,16 +220,6 @@ pub(in crate::tui::ui) fn render_channels(frame: &mut Frame, area: Rect, state: 
                         ..
                     } => {
                         let branch_prefix = parent_branch.participant_prefix();
-                        let mut label = participant.display_name.clone();
-                        if participant.self_stream {
-                            label.push_str(" 🔴 LIVE");
-                        }
-                        if participant.mute || participant.self_mute {
-                            label.push_str(" 🔇");
-                        }
-                        if participant.deaf || participant.self_deaf {
-                            label.push_str(" 🎧");
-                        }
                         let label_style = if participant.speaking {
                             Style::default().fg(Color::Green).bold()
                         } else {
@@ -244,7 +234,11 @@ pub(in crate::tui::ui) fn render_channels(frame: &mut Frame, area: Rect, state: 
                             Span::styled(branch_prefix, Style::default().fg(DIM)),
                             Span::styled(prefix, Style::default().fg(DIM)),
                             Span::styled(
-                                truncate_display_width_from(&label, horizontal_scroll, label_width),
+                                voice_participant_label(
+                                    participant,
+                                    horizontal_scroll,
+                                    label_width,
+                                ),
                                 label_style,
                             ),
                         ]))
@@ -281,4 +275,43 @@ fn selected_channel_server_label(state: &DashboardState) -> String {
         .and_then(|guild_id| state.guild_name(guild_id))
         .unwrap_or("Direct Messages")
         .to_owned()
+}
+
+fn voice_participant_label(
+    participant: &crate::discord::VoiceParticipantState,
+    horizontal_scroll: usize,
+    max_width: usize,
+) -> String {
+    let mut indicators = String::new();
+    if participant.self_stream {
+        indicators.push_str(" 🔴");
+    }
+    if participant.mute || participant.self_mute {
+        indicators.push_str(" 🔇");
+    }
+    if participant.deaf || participant.self_deaf {
+        indicators.push_str(" 🎧");
+    }
+
+    let indicator_width = indicators.width();
+    if indicator_width == 0 {
+        return truncate_display_width_from(
+            &participant.display_name,
+            horizontal_scroll,
+            max_width,
+        );
+    }
+    if max_width <= indicator_width {
+        return truncate_display_width(&indicators, max_width);
+    }
+
+    format!(
+        "{}{}",
+        truncate_display_width_from(
+            &participant.display_name,
+            horizontal_scroll,
+            max_width.saturating_sub(indicator_width),
+        ),
+        indicators
+    )
 }
