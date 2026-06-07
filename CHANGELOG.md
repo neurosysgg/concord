@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.13] - 2026-06-08
+
+### Bug Fixes
+
+- _(tui)_ Preserve member search selection across member cache refreshes by @chojs23
+- _(tui)_ Prevent popup residue on terminal images by @chojs23
+- Retain member cache for more recent guilds by @chojs23
+
+### Documentation
+
+- Update readme by @chojs23
+
+### Features
+
+- Add --check-config validation command by @chojs23
+- _(tui)_ Keep voice indicators visible after name truncation by @chojs23
+
 ## [2.1.12] - 2026-06-07
 
 ### Bug Fixes
