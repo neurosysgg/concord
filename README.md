@@ -191,7 +191,7 @@ Tokens are saved under Concord's config directory in plain text. See the Securit
 - Direct message shortcuts for copy, reply, edit, delete, reactions, URL opening,
   and image viewing. More message actions are available from the action menu.
 
-#### Markdown Rendering
+#### Markdown Rendering & Code syntax highlighting
 
 ![Markdown rendering example](./docs/markdown-example.png)
 
@@ -202,6 +202,7 @@ Concord renders a practical subset of Discord-style Markdown in message bodies:
 - Bullets: `- item` and `* item`
 - Inline styles: `**bold**`, `*italic*`, and `` `inline code` ``
 - Fenced code blocks with optional language labels, rendered as compact boxes
+  with syntax highlighting
 - Raw URLs and markdown link destinations are underlined and can be opened from message actions
 
 ### Reactions & Polls
@@ -227,8 +228,9 @@ You can toggle image viewing on or off in the configuration file. When image vie
 ### Members & Profiles
 
 - Member list with grouping
+- Search members in server
 - Presence indicators (Online, Idle, DND, Offline)
-- View User profile
+- Configure user profile and custom activity status
 
 ### Typing Indicators & Read State
 
