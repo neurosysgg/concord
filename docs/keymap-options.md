@@ -9,6 +9,7 @@ Example `keymap.toml`:
 ```toml
 [keymap]
 StartComposer = { keys = ["c"] }
+ClosePopup = "q"
 ReplyMessage = "<leader>mr"
 VoiceDeafen = "<leader>vd"
 VoiceMute = "<leader>vm"
@@ -34,13 +35,13 @@ DeletePreviousWord = "<A-backspace>"
 
 There are several kinds of keymap settings:
 
-| Config path                                                                                                 | What it controls                                                                          |
-| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `[keymap] leader`                                                                                           | The key that opens the leader popup. Defaults to `Space`.                                 |
-| `[keymap] <ActionName>`                                                                                     | Directly assignable UI actions such as `StartComposer`, `ReplyMessage`, and `OpenThread`. |
-| `[keymap.groups]`                                                                                           | Optional titles for prefix popups, such as naming `<leader>v` as `Voice`.                 |
-| `[keymap.guild_actions]`, `[keymap.channel_actions]`, `[keymap.message_actions]`, `[keymap.member_actions]` | Shortcuts shown inside focused-pane action menus opened by `OpenFocusedPaneAction`.       |
-| `[keymap.composer]`                                                                                         | Shortcuts used while the message composer is open, such as editor and cursor commands.    |
+| Config path                                                                                                 | What it controls                                                                                        |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `[keymap] leader`                                                                                           | The key that opens the leader popup. Defaults to `Space`.                                               |
+| `[keymap] <ActionName>`                                                                                     | Directly assignable UI actions such as `StartComposer`, `ClosePopup`, `ReplyMessage`, and `OpenThread`. |
+| `[keymap.groups]`                                                                                           | Optional titles for prefix popups, such as naming `<leader>v` as `Voice`.                               |
+| `[keymap.guild_actions]`, `[keymap.channel_actions]`, `[keymap.message_actions]`, `[keymap.member_actions]` | Shortcuts shown inside focused-pane action menus opened by `OpenFocusedPaneAction`.                     |
+| `[keymap.composer]`                                                                                         | Shortcuts used while the message composer is open, such as editor and cursor commands.                  |
 
 `[keymap]` action values can be either a string or an object with `keys` and an
 optional `description`:
@@ -85,8 +86,8 @@ DeletePreviousWord = "<A-backspace>"
 Direct `[keymap]` actions and `leader` cannot use reserved keys: `Enter`, `Esc`,
 `Backspace`, `Delete`, `Ctrl+c`, `Ctrl+n`, or `Ctrl+p`. Invalid, reserved, or
 conflicting bindings are ignored for that action. `[keymap.composer]` is separate
-and can remap those editing keys. `Ctrl+n` and `Ctrl+p` always move row
-selection down and up.
+and can remap those editing keys. `Esc` always closes active popups, and
+`Ctrl+n` and `Ctrl+p` always move row selection down and up.
 
 ## Directly assignable actions
 
@@ -102,6 +103,7 @@ Navigation and app actions:
 | ----------------------- | -------------------------- | ---------------------------------------- |
 | `StartComposer`         | `"i"`                      | Start the message composer.              |
 | `OpenPaneFilter`        | `"/"`                      | Open the focused pane filter or search.  |
+| `ClosePopup`            | `"q"`                      | Close the active popup.                  |
 | `FocusGuildPane`        | `"1"`                      | Show and focus the Servers pane.         |
 | `FocusChannelPane`      | `"2"`                      | Show and focus the Channels pane.        |
 | `FocusMessagePane`      | `"3"`                      | Focus the Messages pane.                 |
@@ -165,25 +167,25 @@ These action names can be assigned under `[keymap.composer]`. Configured keys
 replace that action's defaults. Any printable single character can be configured,
 but that key will run the composer action instead of inserting text.
 
-| Composer action        | Default config                            | Action                               |
-| ---------------------- | ----------------------------------------- | ------------------------------------ |
-| `OpenEditor`           | `"<C-e>"`                                 | Open the current draft in `$EDITOR`. |
-| `PasteClipboard`       | `"<C-v>"`                                 | Request clipboard paste.             |
-| `InsertNewline`        | `["<S-enter>", "<C-enter>", "<A-enter>"]` | Insert a newline.                    |
-| `Submit`               | `"enter"`                                 | Submit the composer.                 |
-| `Close`                | `"esc"`                                   | Close the composer.                  |
-| `ClearInput`           | `"<C-c>"`                                 | Clear the composer input.            |
-| `RemoveLastAttachment` | `"delete"`                                | Remove the last pending attachment.  |
-| `DeletePreviousChar`   | `"backspace"`                             | Delete the previous character.       |
-| `DeletePreviousWord`   | `["<C-backspace>", "<C-w>"]`              | Delete the word before the cursor.   |
-| `MoveCursorUp`         | `"up"`                                    | Move the cursor up.                  |
-| `MoveCursorDown`       | `"down"`                                  | Move the cursor down.                |
-| `MoveCursorWordLeft`   | `"<C-left>"`                              | Move the cursor one word left.       |
-| `MoveCursorLeft`       | `"left"`                                  | Move the cursor left.                |
-| `MoveCursorWordRight`  | `"<C-right>"`                             | Move the cursor one word right.      |
-| `MoveCursorRight`      | `"right"`                                 | Move the cursor right.               |
-| `MoveCursorHome`       | `"home"`                                  | Move the cursor to the start.        |
-| `MoveCursorEnd`        | `"end"`                                   | Move the cursor to the end.          |
+| Composer action        | Default config                                     | Action                               |
+| ---------------------- | -------------------------------------------------- | ------------------------------------ |
+| `OpenEditor`           | `"<C-e>"`                                          | Open the current draft in `$EDITOR`. |
+| `PasteClipboard`       | `"<C-v>"`                                          | Request clipboard paste.             |
+| `InsertNewline`        | `["<C-j>", "<S-enter>", "<C-enter>", "<A-enter>"]` | Insert a newline.                    |
+| `Submit`               | `"enter"`                                          | Submit the composer.                 |
+| `Close`                | `"esc"`                                            | Close the composer.                  |
+| `ClearInput`           | `"<C-c>"`                                          | Clear the composer input.            |
+| `RemoveLastAttachment` | `"delete"`                                         | Remove the last pending attachment.  |
+| `DeletePreviousChar`   | `"backspace"`                                      | Delete the previous character.       |
+| `DeletePreviousWord`   | `["<A-backspace>", "<C-backspace>", "<C-w>"]`      | Delete the word before the cursor.   |
+| `MoveCursorUp`         | `"up"`                                             | Move the cursor up.                  |
+| `MoveCursorDown`       | `"down"`                                           | Move the cursor down.                |
+| `MoveCursorWordLeft`   | `"<C-left>"`                                       | Move the cursor one word left.       |
+| `MoveCursorLeft`       | `"left"`                                           | Move the cursor left.                |
+| `MoveCursorWordRight`  | `"<C-right>"`                                      | Move the cursor one word right.      |
+| `MoveCursorRight`      | `"right"`                                          | Move the cursor right.               |
+| `MoveCursorHome`       | `"home"`                                           | Move the cursor to the start.        |
+| `MoveCursorEnd`        | `"end"`                                            | Move the cursor to the end.          |
 
 ## Focused pane actions
 

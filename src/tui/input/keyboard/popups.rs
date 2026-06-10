@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use crate::discord::AppCommand;
 use crate::tui::keybindings::{
     AttachmentViewerAction, ChannelSwitcherAction, DebugLogPopupAction, EmojiReactionPickerAction,
-    MessageConfirmationAction, OptionsPopupAction, PollVotePickerAction, PopupListAction,
+    KeyChord, MessageConfirmationAction, OptionsPopupAction, PollVotePickerAction, PopupListAction,
     ProfilePopupAction, ProfilePopupTabAction, ReactionUsersPopupAction, ScrollAction,
     SearchPopupAction, SelectionAction, SelectionKeySet,
 };
@@ -13,7 +13,16 @@ pub(super) fn handle_priority_popup_key(
     state: &mut DashboardState,
     key: KeyEvent,
 ) -> Option<Option<AppCommand>> {
-    if handle_popup_page_key(state, key) {
+    let handled_page = if state.key_bindings().is_popup_close_key(key) {
+        false
+    } else {
+        match state.key_bindings().popup_page_action(key) {
+            Some(SelectionAction::Next) => state.page_active_popup_down(),
+            Some(SelectionAction::Previous) => state.page_active_popup_up(),
+            None => false,
+        }
+    };
+    if handled_page {
         return Some(None);
     }
 
@@ -175,7 +184,12 @@ pub(super) fn handle_message_url_picker_key(
             return state.activate_selected_message_url();
         }
         Some(PopupListAction::ActivateShortcut(shortcut)) => {
-            return state.activate_message_url_shortcut(shortcut);
+            if let Some(command) = state.activate_message_url_shortcut(shortcut) {
+                return Some(command);
+            }
+            if state.key_bindings().is_popup_close_key(key) {
+                state.close_message_url_picker();
+            }
         }
         None => {}
     }
@@ -195,12 +209,30 @@ pub(super) fn handle_message_action_menu_key(
             return state.activate_selected_message_action();
         }
         Some(PopupListAction::ActivateShortcut(shortcut)) => {
-            return state.activate_message_action_shortcut(shortcut);
+            if message_action_shortcut_matches(state, shortcut) {
+                return state.activate_message_action_shortcut(shortcut);
+            }
+            if state.key_bindings().is_popup_close_key(key) {
+                state.close_message_action_menu();
+            }
         }
         None => {}
     }
 
     None
+}
+
+fn message_action_shortcut_matches(state: &DashboardState, shortcut: KeyChord) -> bool {
+    let actions = state.selected_message_action_items();
+    state
+        .key_bindings()
+        .matching_action_shortcut_index(
+            &actions,
+            shortcut,
+            |key_bindings, actions, index| key_bindings.message_action_shortcuts(actions, index),
+            |action| action.enabled,
+        )
+        .is_some()
 }
 
 pub(super) fn handle_message_delete_confirmation_key(
@@ -295,7 +327,7 @@ pub(super) fn handle_user_profile_popup_key(
     key: KeyEvent,
 ) -> Option<AppCommand> {
     if state.is_user_profile_status_picker_open() {
-        if matches!(key.code, KeyCode::Esc | KeyCode::Char('q')) {
+        if state.key_bindings().is_popup_close_key(key) {
             state.close_user_profile_status_picker();
             return None;
         }
@@ -361,17 +393,6 @@ pub(super) fn handle_user_profile_popup_key(
     }
 
     None
-}
-
-pub(super) fn handle_popup_page_key(state: &mut DashboardState, key: KeyEvent) -> bool {
-    let Some(action) = state.key_bindings().popup_page_action(key) else {
-        return false;
-    };
-
-    match action {
-        SelectionAction::Next => state.page_active_popup_down(),
-        SelectionAction::Previous => state.page_active_popup_up(),
-    }
 }
 
 /// Returns `Some(command)` when the filter handler has fully handled the key
@@ -482,16 +503,16 @@ pub(super) fn handle_keymap_popup_key(
     state: &mut DashboardState,
     key: KeyEvent,
 ) -> Option<AppCommand> {
-    match key.code {
-        KeyCode::Esc | KeyCode::Char('q') => state.close_keymap_popup(),
-        _ => {
-            if let Some(action) = state
-                .key_bindings()
-                .selection_action(key, SelectionKeySet::Navigation)
-            {
-                state.scroll_keymap_popup(action);
-            }
-        }
+    if state.key_bindings().is_popup_close_key(key) {
+        state.close_keymap_popup();
+        return None;
+    }
+
+    if let Some(action) = state
+        .key_bindings()
+        .selection_action(key, SelectionKeySet::Navigation)
+    {
+        state.scroll_keymap_popup(action);
     }
 
     None

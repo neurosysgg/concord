@@ -280,7 +280,7 @@ With default vim-style navigation:
 | `/`                                       | Filter Guilds/Channels, search Messages/Members |
 | `Space`                                   | Open leader shortcut window                     |
 | `i`                                       | Text insert mode                                |
-| `Esc`                                     | Close popup, cancel mode, or go back            |
+| `Esc` / `q`                               | Close popup, cancel mode, or go back            |
 | `q`                                       | Quit Concord                                    |
 
 `Ctrl+n` and `Ctrl+p` are fixed row movement keys. The default `j` and `k`
@@ -373,14 +373,14 @@ Voice commands:
 You can paste copied files into the composer to attach them. Pending uploads
 are shown above the input before sending.
 
-| Shortcut                   | Action            | Description                                                      |
-| -------------------------- | ----------------- | ---------------------------------------------------------------- |
-| `Ctrl+v`                   | paste clipboard   | Attach copied files or images when present, otherwise paste text |
-| `Ctrl+e`                   | open $EDITOR      | Open $EDITOR on the current draft for long editing               |
-| `Ctrl+c`                   | clear             | Clear current draft                                              |
-| `Ctrl+Left`/ `Ctrl+Right`  | Jump word         | Jump the cursor by word                                          |
-| `Ctrl+Backspace`/ `Ctrl+w` | Delete word       | Delete the word before the cursor                                |
-| `Delete`                   | Detach attachment | Removes the last pending attachment                              |
+| Shortcut                                     | Action            | Description                                                      |
+| -------------------------------------------- | ----------------- | ---------------------------------------------------------------- |
+| `Ctrl+v`                                     | paste clipboard   | Attach copied files or images when present, otherwise paste text |
+| `Ctrl+e`                                     | open $EDITOR      | Open $EDITOR on the current draft for long editing               |
+| `Ctrl+c`                                     | clear             | Clear current draft                                              |
+| `Ctrl+Left`/ `Ctrl+Right`                    | Jump word         | Jump the cursor by word                                          |
+| `Alt+Backspace`, `Ctrl+Backspace` / `Ctrl+w` | Delete word       | Delete the word before the cursor                                |
+| `Delete`                                     | Detach attachment | Removes the last pending attachment                              |
 
 #### Mention picker
 
@@ -497,6 +497,7 @@ Avatars and custom emoji keep their separate small-image behavior.
 leader = "space"
 StartComposer = "i"
 OpenPaneFilter = "/"
+ClosePopup = "q"
 FocusGuildPane = "1"
 FocusChannelPane = "2"
 FocusMessagePane = "3"
@@ -571,13 +572,13 @@ ShowProfile = "p"
 [keymap.composer]
 OpenEditor = "<C-e>"
 PasteClipboard = "<C-v>"
-InsertNewline = { keys = ["<S-enter>", "<C-enter>", "<A-enter>"] }
+InsertNewline = { keys = ["<C-j>", "<S-enter>", "<C-enter>", "<A-enter>"] }
 Submit = "enter"
 Close = "esc"
 ClearInput = "<C-c>"
 RemoveLastAttachment = "delete"
 DeletePreviousChar = "backspace"
-DeletePreviousWord = { keys = ["<C-backspace>", "<C-w>"] }
+DeletePreviousWord = { keys = ["<A-backspace>", "<C-backspace>", "<C-w>"] }
 MoveCursorUp = "up"
 MoveCursorDown = "down"
 MoveCursorWordLeft = "<C-left>"
