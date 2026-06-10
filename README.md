@@ -21,6 +21,12 @@ Concord is a feature-rich TUI (terminal user interface) client for Discord, writ
 ### Homebrew
 
 ```sh
+brew install concord
+```
+
+Or with the tap for the latest version:
+
+```sh
 brew install chojs23/tap/concord
 ```
 
