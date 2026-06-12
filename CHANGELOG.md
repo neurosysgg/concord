@@ -2,9 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.2.0] - 2026-06-07
+## [2.2.1] - 2026-06-13
 
-Concord save token in system keychain and use it for authentication, so you may need to re-login after this update.
+### Bug Fixes
+
+- Picker scroll by @chojs23
+
+### Documentation
+
+- Update readme by @chojs23
+
+### Features
+
+- Notify for active-channel messages while the terminal is unfocused (#177) in [#177](https://github.com/chojs23/concord/pull/177) by @cultlead3r
+- Add built-in discord commands (#179) in [#179](https://github.com/chojs23/concord/pull/179) by @chojs23
+- Persist TUI side pane visibility (#180) in [#180](https://github.com/chojs23/concord/pull/180) by @chojs23
+
+## [2.2.0] - 2026-06-10
 
 ### Documentation
 
@@ -721,17 +735,8 @@ Concord save token in system keychain and use it for authentication, so you may 
 
 ### Bug Fixes
 
-- Keep original image width:height ratio (#6) in [#6](https://github.com/chojs23/concord/pull/6) by @chojs23
-
-### Cd
-
-- Chain crates publish after release by @chojs23
-
-## [1.1.0] - 2026-05-09
-
-### Bug Fixes
-
 - _(flake)_ Use crane (#4) in [#4](https://github.com/chojs23/concord/pull/4) by @M4jor-Tom
+- Keep original image width:height ratio (#6) in [#6](https://github.com/chojs23/concord/pull/6) by @chojs23
 
 ### Documentation
 
@@ -746,6 +751,10 @@ Concord save token in system keychain and use it for authentication, so you may 
 ### Miscellaneous Tasks
 
 - Enable generated github release notes by @chojs23
+
+### Cd
+
+- Chain crates publish after release by @chojs23
 
 ### New Contributors
 
