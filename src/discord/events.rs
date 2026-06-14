@@ -5,8 +5,8 @@ use crate::discord::ids::{
 
 use super::ApplicationCommandInfo;
 use super::commands::{
-    DownloadAttachmentSource, ForumPostArchiveState, MessageSearchPage, MessageSearchQuery,
-    ReactionEmoji,
+    AttachmentDownloadId, DownloadAttachmentSource, ForumPostArchiveState, MessageSearchPage,
+    MessageSearchQuery, ReactionEmoji,
 };
 use super::{
     ActivityInfo, AttachmentInfo, AttachmentUpdate, ChannelInfo, CustomEmojiInfo, EmbedInfo,
@@ -329,8 +329,26 @@ pub enum AppEvent {
     GatewayError {
         message: String,
     },
+    AttachmentDownloadStarted {
+        id: AttachmentDownloadId,
+        filename: String,
+        total_bytes: Option<u64>,
+        source: DownloadAttachmentSource,
+    },
+    AttachmentDownloadProgress {
+        id: AttachmentDownloadId,
+        downloaded_bytes: u64,
+        total_bytes: Option<u64>,
+    },
     AttachmentDownloadCompleted {
+        id: AttachmentDownloadId,
         path: String,
+        source: DownloadAttachmentSource,
+    },
+    AttachmentDownloadFailed {
+        id: AttachmentDownloadId,
+        filename: String,
+        message: String,
         source: DownloadAttachmentSource,
     },
     UpdateAvailable {
@@ -498,7 +516,10 @@ impl AppEvent {
             AppEvent::GatewayError { .. }
                 | AppEvent::CurrentUserCapabilities { .. }
                 | AppEvent::ApplicationCommandsLoaded { .. }
+                | AppEvent::AttachmentDownloadStarted { .. }
+                | AppEvent::AttachmentDownloadProgress { .. }
                 | AppEvent::AttachmentDownloadCompleted { .. }
+                | AppEvent::AttachmentDownloadFailed { .. }
                 | AppEvent::UpdateAvailable { .. }
                 | AppEvent::ReactionUsersLoaded { .. }
                 | AppEvent::AttachmentPreviewLoaded { .. }
@@ -542,7 +563,10 @@ impl AppEvent {
             | AppEvent::GatewayError { .. }
             | AppEvent::CurrentUserCapabilities { .. }
             | AppEvent::ApplicationCommandsLoaded { .. }
+            | AppEvent::AttachmentDownloadStarted { .. }
+            | AppEvent::AttachmentDownloadProgress { .. }
             | AppEvent::AttachmentDownloadCompleted { .. }
+            | AppEvent::AttachmentDownloadFailed { .. }
             | AppEvent::UpdateAvailable { .. }
             | AppEvent::ActivateChannel { .. }
             | AppEvent::AttachmentPreviewLoaded { .. }

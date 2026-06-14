@@ -23,10 +23,11 @@ use super::{
         lay_out_reaction_chips_with_custom_emoji_images, reaction_line_spans, wrap_text_lines,
     },
     state::{
-        ActiveModalPopupKind, AttachmentViewerItem, ChannelSwitcherItem, ChannelThreadItem,
-        DashboardState, DisplayOptionItem, EmojiReactionItem, FORUM_POST_CARD_HEIGHT, FocusPane,
-        MessageActionItem, MessageUrlItem, PollVotePickerItem, SearchFieldView, SearchPopupMode,
-        SearchPopupView, SearchResultItem, discord_color, presence_color, presence_marker,
+        ActiveModalPopupKind, AttachmentDownloadProgressView, AttachmentViewerItem,
+        ChannelSwitcherItem, ChannelThreadItem, DashboardState, DisplayOptionItem,
+        EmojiReactionItem, FORUM_POST_CARD_HEIGHT, FocusPane, MessageActionItem, MessageUrlItem,
+        PollVotePickerItem, SearchFieldView, SearchPopupMode, SearchPopupView, SearchResultItem,
+        discord_color, presence_color, presence_marker,
     },
 };
 use crate::discord::{
@@ -73,9 +74,9 @@ use self::panes::{
 use self::panes::{render_channels, render_guilds, render_header, render_members};
 use self::popups::{
     keymap_popup_text_area, keymap_popup_total_lines, render_attachment_viewer,
-    render_channel_switcher_popup, render_debug_log_popup, render_emoji_reaction_picker,
-    render_guild_leave_confirmation, render_keymap_help_popup, render_leader_popup,
-    render_message_action_menu, render_message_delete_confirmation,
+    render_channel_switcher_popup, render_debug_log_popup, render_downloads_popup,
+    render_emoji_reaction_picker, render_guild_leave_confirmation, render_keymap_help_popup,
+    render_leader_popup, render_message_action_menu, render_message_delete_confirmation,
     render_message_pin_confirmation, render_message_url_picker, render_options_popup,
     render_poll_vote_picker, render_quit_confirmation, render_reaction_users_popup,
     render_search_popup, render_toast, render_user_profile_popup, user_profile_popup_has_avatar,
@@ -112,6 +113,9 @@ use self::{
         toast_line, user_profile_popup_lines, user_profile_popup_lines_with_activities,
     },
 };
+
+#[cfg(test)]
+pub(in crate::tui::ui) use self::popups::{downloads_popup_area, downloads_popup_lines};
 pub fn sync_view_heights(area: Rect, state: &mut DashboardState) {
     let areas = dashboard_areas(area, state);
     let guild_filter_row = usize::from(
@@ -242,6 +246,7 @@ pub fn render(
     render_debug_log_popup(frame, areas.messages, state);
     render_keymap_help_popup(frame, areas.messages, state);
     render_search_popup(frame, areas.messages, state);
+    render_downloads_popup(frame, frame.area(), state);
     render_toast(frame, frame.area(), state);
 }
 

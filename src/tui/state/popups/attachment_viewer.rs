@@ -20,7 +20,6 @@ impl DashboardState {
         self.popups.modal = Some(ModalPopup::AttachmentViewer(AttachmentViewerState {
             message_id: message.id,
             selection: Default::default(),
-            download_message: None,
             zoom: AttachmentViewerZoom::default(),
         }));
         true
@@ -109,25 +108,12 @@ impl DashboardState {
         Some((viewer.message_id, selected, preview))
     }
 
-    pub fn attachment_viewer_download_message(&self) -> Option<&str> {
-        self.popups
-            .attachment_viewer()
-            .and_then(|viewer| viewer.download_message.as_deref())
-    }
-
-    pub fn record_attachment_viewer_download_completed(&mut self, path: &str) {
-        if let Some(viewer) = self.popups.attachment_viewer_mut() {
-            viewer.download_message = Some(format!("Downloaded to {path}"));
-        }
-    }
-
     pub fn download_selected_attachment_viewer_attachment(&mut self) -> Option<AppCommand> {
         let item = self.selected_attachment_viewer_item()?;
         let url = item.url?;
-        if let Some(viewer) = self.popups.attachment_viewer_mut() {
-            viewer.download_message = Some("Downloading attachment...".to_owned());
-        }
+        let id = self.next_attachment_download_id();
         Some(AppCommand::DownloadAttachment {
+            id,
             url,
             filename: item.filename,
             source: DownloadAttachmentSource::AttachmentViewer,

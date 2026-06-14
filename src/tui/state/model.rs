@@ -1,3 +1,4 @@
+use crate::discord::AttachmentDownloadId;
 use crate::discord::ids::{
     Id,
     marker::{ChannelMarker, GuildMarker, MessageMarker, UserMarker},
@@ -52,6 +53,14 @@ pub enum FocusPane {
     Channels,
     Messages,
     Members,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AttachmentDownloadProgressView {
+    pub id: AttachmentDownloadId,
+    pub filename: String,
+    pub downloaded_bytes: u64,
+    pub total_bytes: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

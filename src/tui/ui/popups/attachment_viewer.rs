@@ -23,29 +23,15 @@ pub(in crate::tui::ui) fn render_attachment_viewer(
     let block = panel_block_owned(title, true);
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
+    let hint_height = inner.height.min(1);
     let body_area = Rect {
-        height: inner.height.saturating_sub(1),
+        height: inner.height.saturating_sub(hint_height),
         ..inner
     };
-    let download_area = Rect {
-        y: inner.y + inner.height.saturating_sub(1),
-        height: inner.height.min(1),
+    let hint_area = (hint_height > 0).then_some(Rect {
+        y: inner.y + inner.height.saturating_sub(hint_height),
+        height: hint_height,
         ..inner
-    };
-    let hint_y = popup.y.saturating_add(popup.height);
-    let hint_lines = wrapped_styled_popup_lines(
-        state.key_bindings().attachment_viewer_download_hint(),
-        usize::from(popup.width),
-        Style::default().fg(DIM),
-    );
-    let available_hint_height = frame_area
-        .y
-        .saturating_add(frame_area.height)
-        .saturating_sub(hint_y);
-    let hint_area = (available_hint_height > 0).then_some(Rect {
-        y: hint_y,
-        height: available_hint_height.min(u16::try_from(hint_lines.len()).unwrap_or(u16::MAX)),
-        ..popup
     });
 
     if item.is_image
@@ -69,19 +55,14 @@ pub(in crate::tui::ui) fn render_attachment_viewer(
         render_attachment_details(frame, body_area, &item);
     }
 
-    if let Some(message) = state.attachment_viewer_download_message() {
-        frame.render_widget(
-            Paragraph::new(truncate_display_width(
-                message,
-                download_area.width.saturating_sub(1).into(),
-            ))
-            .style(Style::default().fg(Color::Green)),
-            download_area,
-        );
-    }
     if let Some(hint_area) = hint_area {
+        let hint = truncate_display_width(
+            state.key_bindings().attachment_viewer_download_hint(),
+            usize::from(hint_area.width),
+        );
         frame.render_widget(
-            Paragraph::new(hint_lines).alignment(Alignment::Center),
+            Paragraph::new(Line::from(Span::styled(hint, Style::default().fg(DIM))))
+                .alignment(Alignment::Center),
             hint_area,
         );
     }

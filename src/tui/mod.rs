@@ -69,8 +69,8 @@ mod tests {
         MessageCreateFixture, guild_message_create_fixture, message_create_event,
     };
     use crate::discord::{
-        AppEvent, AttachmentInfo, AttachmentUpdate, ChannelInfo, DiscordClient,
-        DownloadAttachmentSource, MemberInfo, ReadStateInfo, SequencedAppEvent,
+        AppEvent, AttachmentDownloadId, AttachmentInfo, AttachmentUpdate, ChannelInfo,
+        DiscordClient, DownloadAttachmentSource, MemberInfo, ReadStateInfo, SequencedAppEvent,
     };
 
     use super::{
@@ -287,14 +287,17 @@ mod tests {
     }
 
     #[test]
-    fn visible_signature_changes_when_attachment_download_message_changes() {
+    fn visible_signature_changes_when_attachment_download_progress_changes() {
         let mut state = state_with_messages(0);
         push_image_message(&mut state, 1);
         assert!(state.open_attachment_viewer_for_selected_message());
         let before = visible_dashboard_signature(&state);
+        let id = AttachmentDownloadId::new(3);
 
-        state.push_event(AppEvent::AttachmentDownloadCompleted {
-            path: "/tmp/cat.png".to_owned(),
+        state.push_event(AppEvent::AttachmentDownloadStarted {
+            id,
+            filename: "cat.png".to_owned(),
+            total_bytes: Some(100),
             source: DownloadAttachmentSource::AttachmentViewer,
         });
         let after = visible_dashboard_signature(&state);
@@ -303,6 +306,9 @@ mod tests {
         assert!(should_redraw_after_visible_signature_change(
             &before, &after, true, false,
         ));
+        assert!(
+            !should_refresh_image_protocols_after_visible_signature_change(&before, &after, true,)
+        );
     }
 
     #[test]

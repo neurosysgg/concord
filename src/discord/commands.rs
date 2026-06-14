@@ -17,6 +17,19 @@ pub const MAX_UPLOAD_TOTAL_BYTES: u64 = 25 * 1024 * 1024;
 pub const MAX_UPLOAD_ATTACHMENT_COUNT: usize = 10;
 pub const MAX_PROFILE_AVATAR_BYTES: u64 = 10 * 1024 * 1024;
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct AttachmentDownloadId(u64);
+
+impl AttachmentDownloadId {
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub fn get(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MessageAttachmentUpload {
     source: UploadSource,
@@ -507,6 +520,7 @@ pub enum AppCommand {
         url: String,
     },
     DownloadAttachment {
+        id: AttachmentDownloadId,
         url: String,
         filename: String,
         source: DownloadAttachmentSource,

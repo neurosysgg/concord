@@ -348,7 +348,6 @@ pub(super) struct OptionsPopupState {
 pub(super) struct AttachmentViewerState {
     pub(super) message_id: Id<MessageMarker>,
     pub(super) selection: SelectablePopupState,
-    pub(super) download_message: Option<String>,
     pub(super) zoom: AttachmentViewerZoom,
 }
 

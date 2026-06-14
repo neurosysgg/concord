@@ -64,6 +64,10 @@ pub(in crate::tui) fn effect_forces_redraw(event: &AppEvent) -> bool {
         event,
         AppEvent::AttachmentPreviewLoaded { .. }
             | AppEvent::AttachmentPreviewLoadFailed { .. }
+            | AppEvent::AttachmentDownloadStarted { .. }
+            | AppEvent::AttachmentDownloadProgress { .. }
+            | AppEvent::AttachmentDownloadCompleted { .. }
+            | AppEvent::AttachmentDownloadFailed { .. }
             | AppEvent::GatewayError { .. }
             | AppEvent::GatewayResumed
             | AppEvent::GatewayReidentified

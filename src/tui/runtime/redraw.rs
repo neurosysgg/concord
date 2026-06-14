@@ -22,6 +22,7 @@ pub(in crate::tui) struct VisibleDashboardSignature {
     layout: LayoutSignature,
     header: HeaderSignature,
     overlay: OverlaySignature,
+    passive_overlay: PassiveOverlaySignature,
     pub(in crate::tui) guilds: GuildPaneSignature,
     pub(in crate::tui) channels: ChannelPaneSignature,
     pub(in crate::tui) messages: MessagePaneSignature,
@@ -54,6 +55,11 @@ struct OverlaySignature {
     channel_switcher: ChannelSwitcherSignature,
     channel_action_threads_phase: bool,
     popups: VisiblePopupSignature,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PassiveOverlaySignature {
+    attachment_downloads: Vec<DebugSignature>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -154,7 +160,6 @@ struct MessageUrlPickerPopupSignature {
 struct AttachmentViewerPopupSignature {
     attachment_viewer_open: bool,
     selected_attachment_viewer_item: DebugSignature,
-    attachment_viewer_download_message: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -257,6 +262,7 @@ pub(in crate::tui) struct ChannelEntrySignature {
 struct VisibleDashboardChangeSet {
     layout: bool,
     overlay: bool,
+    passive_overlay: bool,
     header: bool,
     guilds: bool,
     channels: bool,
@@ -270,6 +276,7 @@ impl VisibleDashboardChangeSet {
         self.members
             && !self.layout
             && !self.overlay
+            && !self.passive_overlay
             && !self.header
             && !self.guilds
             && !self.channels
@@ -281,6 +288,7 @@ impl VisibleDashboardChangeSet {
         self.new_message_notice
             && !self.layout
             && !self.overlay
+            && !self.passive_overlay
             && !self.header
             && !self.guilds
             && !self.channels
@@ -374,9 +382,6 @@ pub(in crate::tui) fn visible_dashboard_signature(
                     selected_attachment_viewer_item: debug_signature(
                         &state.selected_attachment_viewer_item(),
                     ),
-                    attachment_viewer_download_message: state
-                        .attachment_viewer_download_message()
-                        .map(str::to_owned),
                 },
                 leaders: LeaderPopupSignature {
                     guild_leader_action_open: state.is_guild_leader_action_active(),
@@ -473,6 +478,13 @@ pub(in crate::tui) fn visible_dashboard_signature(
                 },
                 search: debug_signature(&state.search_popup_view()),
             },
+        },
+        passive_overlay: PassiveOverlaySignature {
+            attachment_downloads: state
+                .attachment_downloads()
+                .into_iter()
+                .map(|download| debug_signature(&download))
+                .collect(),
         },
         guilds: GuildPaneSignature {
             guild_horizontal_scroll: state.guild_horizontal_scroll(),
@@ -573,6 +585,7 @@ fn visible_dashboard_changes(
     VisibleDashboardChangeSet {
         layout: before.layout != after.layout,
         overlay: before.overlay != after.overlay,
+        passive_overlay: before.passive_overlay != after.passive_overlay,
         header: before.header != after.header,
         guilds: before.guilds != after.guilds,
         channels: before.channels != after.channels,

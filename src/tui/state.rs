@@ -3,8 +3,8 @@ use std::{collections::HashSet, time::Instant};
 use crate::discord::ids::marker::{GuildMarker, UserMarker};
 
 use crate::discord::{
-    AppCommand, AppEvent, DownloadAttachmentSource, ForumPostArchiveState, MentionInfo,
-    MessageSnapshotInfo, VoiceConnectionStatus,
+    AppCommand, AppEvent, ForumPostArchiveState, MentionInfo, MessageSnapshotInfo,
+    VoiceConnectionStatus,
 };
 use crate::logging;
 
@@ -57,12 +57,12 @@ pub use dashboard::DashboardState;
 pub use member_grouping::{MemberEntry, MemberGroup};
 pub use message_viewport::MessagePaneSource;
 pub use model::{
-    AttachmentViewerItem, ChannelActionItem, ChannelPaneEntry, ChannelSearchSuggestionItem,
-    ChannelSwitcherItem, ChannelThreadItem, EmojiReactionItem, FORUM_POST_CARD_HEIGHT, FocusPane,
-    GuildActionItem, GuildPaneEntry, MemberActionItem, MemberSearchResultItem, MessageActionItem,
-    MessageActionKind, MessageSearchResultItem, MuteActionDurationItem, PollVotePickerItem,
-    SearchFieldView, SearchPopupMode, SearchPopupView, SearchResultItem, SearchSuggestionItem,
-    ThreadMessagePreview, ThreadSummary,
+    AttachmentDownloadProgressView, AttachmentViewerItem, ChannelActionItem, ChannelPaneEntry,
+    ChannelSearchSuggestionItem, ChannelSwitcherItem, ChannelThreadItem, EmojiReactionItem,
+    FORUM_POST_CARD_HEIGHT, FocusPane, GuildActionItem, GuildPaneEntry, MemberActionItem,
+    MemberSearchResultItem, MessageActionItem, MessageActionKind, MessageSearchResultItem,
+    MuteActionDurationItem, PollVotePickerItem, SearchFieldView, SearchPopupMode, SearchPopupView,
+    SearchResultItem, SearchSuggestionItem, ThreadMessagePreview, ThreadSummary,
 };
 pub use model::{ChannelActionKind, GuildActionKind, MemberActionKind, MessageUrlItem};
 pub use options::DisplayOptionItem;
@@ -199,10 +199,43 @@ impl DashboardState {
                     .insert(*guild_id, commands.clone());
                 self.refresh_active_mention_query();
             }
-            AppEvent::AttachmentDownloadCompleted { path, source }
-                if *source == DownloadAttachmentSource::AttachmentViewer =>
-            {
-                self.record_attachment_viewer_download_completed(path);
+            AppEvent::AttachmentDownloadStarted {
+                id,
+                filename,
+                total_bytes,
+                source,
+            } => {
+                self.record_attachment_download_started(
+                    *id,
+                    filename.clone(),
+                    *total_bytes,
+                    *source,
+                );
+            }
+            AppEvent::AttachmentDownloadProgress {
+                id,
+                downloaded_bytes,
+                total_bytes,
+            } => {
+                self.record_attachment_download_progress(*id, *downloaded_bytes, *total_bytes);
+            }
+            AppEvent::AttachmentDownloadCompleted { id, path, .. } => {
+                self.remove_attachment_download(*id);
+                self.show_success_toast(format!("Downloaded to {path}"), Instant::now());
+            }
+            AppEvent::AttachmentDownloadFailed {
+                id,
+                filename,
+                message,
+                ..
+            } => {
+                let filename = self
+                    .remove_attachment_download(*id)
+                    .unwrap_or_else(|| filename.clone());
+                self.show_error_toast(
+                    format!("Download {filename} failed: {message}"),
+                    Instant::now(),
+                );
             }
             AppEvent::UpdateAvailable { latest_version } => {
                 self.discord.update_available_version = Some(latest_version.clone());

@@ -604,7 +604,10 @@ impl DiscordState {
             | AppEvent::CurrentUserCapabilities { .. }
             | AppEvent::ApplicationCommandsLoaded { .. }
             | AppEvent::GatewayError { .. }
+            | AppEvent::AttachmentDownloadStarted { .. }
+            | AppEvent::AttachmentDownloadProgress { .. }
             | AppEvent::AttachmentDownloadCompleted { .. }
+            | AppEvent::AttachmentDownloadFailed { .. }
             | AppEvent::UpdateAvailable { .. }
             | AppEvent::ReactionUsersLoaded { .. }
             | AppEvent::AttachmentPreviewLoaded { .. }
@@ -1409,7 +1412,10 @@ impl DiscordState {
             }
             AppEvent::GatewayError { .. }
             | AppEvent::ApplicationCommandsLoaded { .. }
+            | AppEvent::AttachmentDownloadStarted { .. }
+            | AppEvent::AttachmentDownloadProgress { .. }
             | AppEvent::AttachmentDownloadCompleted { .. }
+            | AppEvent::AttachmentDownloadFailed { .. }
             | AppEvent::UpdateAvailable { .. }
             | AppEvent::ReactionUsersLoaded { .. }
             | AppEvent::AttachmentPreviewLoaded { .. }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::tui::keybindings::{KeymapBindingSummary, OptionsCategoryShortcut};
+use crate::tui::ui::{downloads_popup_area, downloads_popup_lines};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::collections::BTreeMap;
 
@@ -101,6 +102,37 @@ fn dashboard_renders_toast_at_bottom_left() {
 }
 
 #[test]
+fn downloads_popup_lines_show_percent_and_unknown_size() {
+    let downloads = vec![
+        AttachmentDownloadProgressView {
+            id: AttachmentDownloadId::new(1),
+            filename: "cat.png".to_owned(),
+            downloaded_bytes: 50,
+            total_bytes: Some(100),
+        },
+        AttachmentDownloadProgressView {
+            id: AttachmentDownloadId::new(2),
+            filename: "clip.mp4".to_owned(),
+            downloaded_bytes: 1024,
+            total_bytes: None,
+        },
+    ];
+
+    let lines = downloads_popup_lines(&downloads, 48);
+    let rendered = line_texts_from_ratatui(&lines).join("\n");
+
+    assert!(rendered.contains("cat.png 50%"), "{rendered}");
+    assert!(
+        rendered.contains("clip.mp4 1.0 KiB downloaded"),
+        "{rendered}"
+    );
+    assert_eq!(
+        downloads_popup_area(Rect::new(5, 2, 60, 12), lines.len()).x,
+        17
+    );
+}
+
+#[test]
 fn search_popup_message_results_show_sent_time() {
     let message_id = test_message_id_for_unix_millis(discord_epoch_unix_millis());
     let mut state = state_with_message_id(message_id, "seed");
@@ -189,16 +221,20 @@ fn options_popup_render_keeps_selected_row_visible_when_short() {
 }
 
 #[test]
-fn attachment_viewer_render_shows_download_hint_below_popup() {
+fn attachment_viewer_render_shows_download_hint_inside_popup() {
     let mut state = state_with_file_attachment_message();
     assert!(state.open_attachment_viewer_for_selected_message());
 
     let dump = render_dashboard_dump(100, 25, &mut state);
     let rendered = dump.join("\n");
+    let hint_row = dump
+        .iter()
+        .find(|row| row.contains("[d] download"))
+        .expect("download hint should render");
 
     assert!(rendered.contains("File: notes.txt"), "{rendered}");
     assert!(rendered.contains("Size: 42 B"), "{rendered}");
-    assert!(rendered.contains("[d] download"), "{rendered}");
+    assert!(hint_row.contains('│'), "{rendered}");
     assert!(rendered.contains("[z] zoom"), "{rendered}");
 }
 

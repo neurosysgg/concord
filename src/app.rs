@@ -1,6 +1,5 @@
 use std::{
-    fs,
-    io::{self, Write},
+    fs, io,
     path::{Path, PathBuf},
     process::Command,
     sync::Arc,
@@ -11,15 +10,17 @@ use crate::discord::ids::{
     marker::{ChannelMarker, MessageMarker},
 };
 use chrono::{Duration as ChronoDuration, SecondsFormat, Utc};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::{Semaphore, mpsc};
-use tokio::time::{Duration, sleep, timeout};
+use tokio::time::{Duration, Instant as TokioInstant, sleep, timeout};
 
 use crate::{
     DiscordClient, Result, config,
     discord::{
-        AppCommand, AppEvent, AttachmentUpdate, ChannelNotificationOverrideInfo,
-        GuildNotificationSettingsInfo, MessageHistoryLoadTarget, MessageInfo, MuteDuration,
-        ReactionUsersInfo, VoiceConnectionStatus, read_profile_avatar_image, validate_token_header,
+        AppCommand, AppEvent, AttachmentDownloadId, AttachmentUpdate,
+        ChannelNotificationOverrideInfo, DownloadAttachmentSource, GuildNotificationSettingsInfo,
+        MessageHistoryLoadTarget, MessageInfo, MuteDuration, ReactionUsersInfo,
+        VoiceConnectionStatus, read_profile_avatar_image, validate_token_header,
     },
     error::AppError,
     logging, token_store, tui,
@@ -31,9 +32,11 @@ const MESSAGE_HISTORY_LIMIT: u16 = 50;
 const THREAD_PREVIEW_LIMIT: u16 = 1;
 const MENTION_MEMBER_SEARCH_LIMIT: u16 = 10;
 const MAX_ATTACHMENT_PREVIEW_BYTES: usize = 8 * 1024 * 1024;
-const MAX_ATTACHMENT_DOWNLOAD_BYTES: usize = 64 * 1024 * 1024;
 const ATTACHMENT_PREVIEW_TIMEOUT: Duration = Duration::from_secs(30);
+const ATTACHMENT_DOWNLOAD_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const ATTACHMENT_DOWNLOAD_PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 const MAX_CONCURRENT_ATTACHMENT_PREVIEWS: usize = 4;
+const MAX_CONCURRENT_ATTACHMENT_DOWNLOADS: usize = 2;
 
 #[derive(Default)]
 pub struct App;
@@ -104,11 +107,14 @@ fn start_command_loop(
     tokio::spawn(async move {
         let attachment_preview_permits =
             Arc::new(Semaphore::new(MAX_CONCURRENT_ATTACHMENT_PREVIEWS));
+        let attachment_download_permits =
+            Arc::new(Semaphore::new(MAX_CONCURRENT_ATTACHMENT_DOWNLOADS));
         // Spawn commands independently so slow REST calls do not block the
         // whole UI command queue.
         while let Some(command) = commands.recv().await {
             let client = client.clone();
             let attachment_preview_permits = attachment_preview_permits.clone();
+            let attachment_download_permits = attachment_download_permits.clone();
             tokio::spawn(async move {
                 match command {
                     AppCommand::LoadMessageHistory { channel_id, before } => {
@@ -844,35 +850,43 @@ fn start_command_loop(
                         }
                     }
                     AppCommand::DownloadAttachment {
+                        id,
                         url,
                         filename,
                         source,
                     } => {
-                        match timeout(
-                            ATTACHMENT_PREVIEW_TIMEOUT,
-                            download_attachment(&url, &filename),
-                        )
-                        .await
-                        {
-                            Err(_) => {
-                                let message = "download attachment timed out".to_owned();
-                                logging::error("attachment", &message);
-                                client
-                                    .publish_event(AppEvent::GatewayError { message })
-                                    .await;
-                            }
-                            Ok(Ok(path)) => {
+                        let Ok(_permit) = attachment_download_permits.acquire_owned().await else {
+                            let message = "attachment download limiter closed".to_owned();
+                            logging::error("attachment", &message);
+                            client
+                                .publish_event(AppEvent::AttachmentDownloadFailed {
+                                    id,
+                                    filename,
+                                    message,
+                                    source,
+                                })
+                                .await;
+                            return;
+                        };
+                        match download_attachment(&client, id, &url, &filename, source).await {
+                            Ok(path) => {
                                 client
                                     .publish_event(AppEvent::AttachmentDownloadCompleted {
+                                        id,
                                         path: path.display().to_string(),
                                         source,
                                     })
                                     .await
                             }
-                            Ok(Err(message)) => {
+                            Err(message) => {
                                 logging::error("attachment", &message);
                                 client
-                                    .publish_event(AppEvent::GatewayError { message })
+                                    .publish_event(AppEvent::AttachmentDownloadFailed {
+                                        id,
+                                        filename,
+                                        message,
+                                        source,
+                                    })
                                     .await;
                             }
                         }
@@ -1452,20 +1466,75 @@ async fn fetch_attachment_preview(url: &str) -> std::result::Result<Vec<u8>, Str
     .await
 }
 
-async fn download_attachment(url: &str, filename: &str) -> std::result::Result<PathBuf, String> {
-    let bytes = fetch_limited_bytes(
-        url,
-        MAX_ATTACHMENT_DOWNLOAD_BYTES,
-        "attachment",
-        "download attachment failed",
-        "read attachment failed",
-    )
-    .await?;
-
+async fn download_attachment(
+    client: &DiscordClient,
+    id: AttachmentDownloadId,
+    url: &str,
+    filename: &str,
+    source: DownloadAttachmentSource,
+) -> std::result::Result<PathBuf, String> {
+    let mut response = timeout(ATTACHMENT_DOWNLOAD_IDLE_TIMEOUT, reqwest::get(url))
+        .await
+        .map_err(|_| "download attachment timed out".to_owned())?
+        .map_err(|error| format!("download attachment failed: {error}"))?
+        .error_for_status()
+        .map_err(|error| format!("download attachment failed: {error}"))?;
+    let total_bytes = response.content_length();
+    let filename = sanitize_filename(filename);
     let directory = downloads_directory()?;
     fs::create_dir_all(&directory)
         .map_err(|error| format!("create download directory failed: {error}"))?;
-    write_unique_download_file(&directory, &sanitize_filename(filename), &bytes)
+    let (mut file, temp_path) = create_download_temp_file(&directory)?;
+
+    client
+        .publish_event(AppEvent::AttachmentDownloadStarted {
+            id,
+            filename: filename.clone(),
+            total_bytes,
+            source,
+        })
+        .await;
+
+    let mut downloaded_bytes = 0u64;
+    let mut last_reported_bytes = 0u64;
+    let mut next_progress_at = TokioInstant::now() + ATTACHMENT_DOWNLOAD_PROGRESS_INTERVAL;
+    while let Some(chunk) = timeout(ATTACHMENT_DOWNLOAD_IDLE_TIMEOUT, response.chunk())
+        .await
+        .map_err(|_| "read attachment timed out".to_owned())?
+        .map_err(|error| format!("read attachment failed: {error}"))?
+    {
+        file.write_all(&chunk)
+            .await
+            .map_err(|error| format!("write attachment failed: {error}"))?;
+        downloaded_bytes = downloaded_bytes.saturating_add(chunk.len() as u64);
+        let now = TokioInstant::now();
+        if now >= next_progress_at {
+            client
+                .publish_event(AppEvent::AttachmentDownloadProgress {
+                    id,
+                    downloaded_bytes,
+                    total_bytes,
+                })
+                .await;
+            last_reported_bytes = downloaded_bytes;
+            next_progress_at = now + ATTACHMENT_DOWNLOAD_PROGRESS_INTERVAL;
+        }
+    }
+
+    file.flush()
+        .await
+        .map_err(|error| format!("write attachment failed: {error}"))?;
+    drop(file.into_std().await);
+    if downloaded_bytes != last_reported_bytes {
+        client
+            .publish_event(AppEvent::AttachmentDownloadProgress {
+                id,
+                downloaded_bytes,
+                total_bytes,
+            })
+            .await;
+    }
+    persist_unique_download_file(&directory, &filename, temp_path)
 }
 
 async fn fetch_limited_bytes(
@@ -1532,10 +1601,21 @@ fn sanitize_filename(filename: &str) -> String {
     }
 }
 
-fn write_unique_download_file(
+fn create_download_temp_file(
+    directory: &Path,
+) -> std::result::Result<(tokio::fs::File, tempfile::TempPath), String> {
+    let temp = tempfile::Builder::new()
+        .prefix(".concord-download-")
+        .tempfile_in(directory)
+        .map_err(|error| format!("create temporary download file failed: {error}"))?;
+    let (file, path) = temp.into_parts();
+    Ok((tokio::fs::File::from_std(file), path))
+}
+
+fn persist_unique_download_file(
     directory: &Path,
     filename: &str,
-    bytes: &[u8],
+    mut temp_path: tempfile::TempPath,
 ) -> std::result::Result<PathBuf, String> {
     let original = Path::new(filename);
     let stem = original
@@ -1554,18 +1634,12 @@ fn write_unique_download_file(
             }
         };
 
-        match fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&candidate)
-        {
-            Ok(mut file) => {
-                file.write_all(bytes)
-                    .map_err(|error| format!("write attachment failed: {error}"))?;
-                return Ok(candidate);
+        match temp_path.persist_noclobber(&candidate) {
+            Ok(()) => return Ok(candidate),
+            Err(error) if error.error.kind() == io::ErrorKind::AlreadyExists => {
+                temp_path = error.path;
             }
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
-            Err(error) => return Err(format!("write attachment failed: {error}")),
+            Err(error) => return Err(format!("persist attachment failed: {}", error.error)),
         }
     }
 
@@ -1747,11 +1821,11 @@ async fn shutdown_gateway(client: &DiscordClient, mut gateway_task: tokio::task:
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, process};
+    use std::{fs, io::Write, process};
 
     use super::{
-        login_notice_for_token_warnings, open_url, sanitize_filename,
-        windows_open_url_command_spec, write_unique_download_file,
+        login_notice_for_token_warnings, open_url, persist_unique_download_file, sanitize_filename,
+        windows_open_url_command_spec,
     };
 
     fn unix_timestamp_nanos() -> u128 {
@@ -1762,7 +1836,7 @@ mod tests {
     }
 
     #[test]
-    fn write_unique_download_file_uses_next_available_name() {
+    fn persist_unique_download_file_uses_next_available_name() {
         let directory = std::env::temp_dir().join(format!(
             "concord-download-test-{}-{}",
             process::id(),
@@ -1771,8 +1845,14 @@ mod tests {
         fs::create_dir_all(&directory).expect("test directory should be created");
         let existing = directory.join("cat.png");
         fs::write(&existing, b"old").expect("existing file should be written");
+        let mut temp = tempfile::Builder::new()
+            .tempfile_in(&directory)
+            .expect("temporary file should be created");
+        temp.write_all(b"new")
+            .expect("temporary file should be written");
+        let temp_path = temp.into_temp_path();
 
-        let path = write_unique_download_file(&directory, "cat.png", b"new")
+        let path = persist_unique_download_file(&directory, "cat.png", temp_path)
             .expect("download file should be written");
 
         assert_eq!(

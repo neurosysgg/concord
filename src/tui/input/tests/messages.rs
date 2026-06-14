@@ -790,15 +790,13 @@ fn attachment_viewer_d_shortcut_downloads_attachment() {
     assert_eq!(
         command,
         Some(AppCommand::DownloadAttachment {
+            id: AttachmentDownloadId::new(0),
             url: "https://cdn.discordapp.com/cat.png".to_owned(),
             filename: "cat.png".to_owned(),
             source: DownloadAttachmentSource::AttachmentViewer,
         })
     );
-    assert_eq!(
-        state.attachment_viewer_download_message(),
-        Some("Downloading attachment...")
-    );
+    assert!(state.attachment_downloads().is_empty());
 }
 
 #[test]

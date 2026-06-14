@@ -1,5 +1,5 @@
 use super::*;
-use crate::discord::AppCommand;
+use crate::discord::{AppCommand, AttachmentDownloadId};
 
 fn message_action(actions: &[MessageActionItem], kind: MessageActionKind) -> &MessageActionItem {
     actions
@@ -130,16 +130,14 @@ fn attachment_viewer_navigation_clamps_and_downloads_current_attachment() {
     assert_eq!(
         command,
         Some(AppCommand::DownloadAttachment {
+            id: AttachmentDownloadId::new(0),
             url: "https://cdn.discordapp.com/image-11.png".to_owned(),
             filename: "image-11.png".to_owned(),
             source: DownloadAttachmentSource::AttachmentViewer,
         })
     );
     assert!(state.is_active_modal_popup(crate::tui::state::ActiveModalPopupKind::AttachmentViewer));
-    assert_eq!(
-        state.attachment_viewer_download_message(),
-        Some("Downloading attachment...")
-    );
+    assert!(state.attachment_downloads().is_empty());
 }
 
 #[test]
@@ -168,6 +166,7 @@ fn attachment_viewer_download_uses_original_url_not_preview_proxy() {
     assert_eq!(
         command,
         Some(AppCommand::DownloadAttachment {
+            id: AttachmentDownloadId::new(0),
             url: "https://cdn.discordapp.com/original/photo.png".to_owned(),
             filename: "image-10.png".to_owned(),
             source: DownloadAttachmentSource::AttachmentViewer,
@@ -176,7 +175,7 @@ fn attachment_viewer_download_uses_original_url_not_preview_proxy() {
 }
 
 #[test]
-fn attachment_viewer_download_completed_event_updates_viewer_message() {
+fn attachment_download_events_update_global_progress() {
     let mut state = state_with_messages(1);
     state.push_event(latest_history_loaded(
         Id::new(2),
@@ -188,15 +187,56 @@ fn attachment_viewer_download_completed_event_updates_viewer_message() {
     ));
     state.focus_pane(FocusPane::Messages);
     state.direct_open_selected_message_attachment_viewer();
+    let id = AttachmentDownloadId::new(7);
+
+    state.push_event(AppEvent::AttachmentDownloadStarted {
+        id,
+        filename: "cat.png".to_owned(),
+        total_bytes: Some(100),
+        source: DownloadAttachmentSource::AttachmentViewer,
+    });
+
+    assert_eq!(state.attachment_downloads().len(), 1);
+
+    state.close_attachment_viewer();
+    state.push_event(AppEvent::AttachmentDownloadProgress {
+        id,
+        downloaded_bytes: 40,
+        total_bytes: Some(100),
+    });
+
+    assert_eq!(state.attachment_downloads()[0].downloaded_bytes, 40);
 
     state.push_event(AppEvent::AttachmentDownloadCompleted {
+        id,
         path: "/tmp/cat.png".to_owned(),
         source: DownloadAttachmentSource::AttachmentViewer,
     });
 
+    assert!(state.attachment_downloads().is_empty());
     assert_eq!(
-        state.attachment_viewer_download_message(),
+        state.toast_message().map(|toast| toast.text),
         Some("Downloaded to /tmp/cat.png")
+    );
+
+    let failed_id = AttachmentDownloadId::new(8);
+    state.push_event(AppEvent::AttachmentDownloadStarted {
+        id: failed_id,
+        filename: "dog.png".to_owned(),
+        total_bytes: None,
+        source: DownloadAttachmentSource::AttachmentViewer,
+    });
+    state.push_event(AppEvent::AttachmentDownloadFailed {
+        id: failed_id,
+        filename: "dog.png".to_owned(),
+        message: "network reset".to_owned(),
+        source: DownloadAttachmentSource::AttachmentViewer,
+    });
+
+    assert!(state.attachment_downloads().is_empty());
+    assert_eq!(
+        state.toast_message().map(|toast| toast.text),
+        Some("Download dog.png failed: network reset")
     );
 }
 

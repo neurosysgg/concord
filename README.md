@@ -618,7 +618,6 @@ and then drop again as work completes and caches are pruned.
 To keep resource usage bounded, Concord limits media work in several places:
 
 - Attachment previews are downloaded with an 8 MiB per-preview cap.
-- Attachment downloads are capped at 64 MiB.
 - Up to 4 attachment previews are fetched at once.
 - Up to 2 inline image previews are decoded at once.
 - Inline image previews, avatars, and custom emoji use small LRU caches.

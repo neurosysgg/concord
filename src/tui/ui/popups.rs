@@ -10,6 +10,7 @@ mod attachment_viewer;
 mod channel_switcher;
 mod confirmation;
 mod debug_log;
+mod downloads;
 mod keymap;
 mod options;
 mod polls;
@@ -41,6 +42,9 @@ pub(super) use confirmation::{
 #[cfg(test)]
 pub(super) use debug_log::debug_log_popup_lines;
 pub(super) use debug_log::render_debug_log_popup;
+pub(super) use downloads::render_downloads_popup;
+#[cfg(test)]
+pub(super) use downloads::{downloads_popup_area, downloads_popup_lines};
 #[cfg(test)]
 pub(super) use keymap::keymap_help_popup_lines;
 pub(super) use keymap::{
