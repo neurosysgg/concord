@@ -264,6 +264,11 @@ mod tests {
     fn overlay_changes_refresh_image_protocols_when_image_surfaces_are_visible() {
         let mut state = state_with_messages(1);
         push_image_message(&mut state, 2);
+        state.push_event(AppEvent::ChannelUpsert(ChannelInfo {
+            guild_id: Some(Id::new(1)),
+            name: "random".to_owned(),
+            ..ChannelInfo::test(Id::new(3), "GuildText")
+        }));
         state.focus_pane(FocusPane::Messages);
         let before = visible_dashboard_signature(&state);
 
@@ -278,12 +283,24 @@ mod tests {
             !should_refresh_image_protocols_after_visible_signature_change(&before, &open, false)
         );
 
+        state.move_channel_switcher_down();
+        let moved = visible_dashboard_signature(&state);
+
+        assert_eq!(state.selected_channel_switcher_index(), Some(1));
+        assert_ne!(open, moved);
+        assert!(should_redraw_after_visible_signature_change(
+            &open, &moved, true, false,
+        ));
+        assert!(
+            !should_refresh_image_protocols_after_visible_signature_change(&open, &moved, true)
+        );
+
         state.close_channel_switcher();
         let closed = visible_dashboard_signature(&state);
 
-        assert_ne!(open, closed);
+        assert_ne!(moved, closed);
         assert!(
-            should_refresh_image_protocols_after_visible_signature_change(&open, &closed, true)
+            should_refresh_image_protocols_after_visible_signature_change(&moved, &closed, true)
         );
     }
 

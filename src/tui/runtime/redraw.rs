@@ -48,6 +48,7 @@ struct HeaderSignature {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct OverlaySignature {
+    active_modal_popup_kind: Option<ActiveModalPopupKind>,
     leader_active: bool,
     leader_action_mode: bool,
     leader_title: Option<String>,
@@ -340,6 +341,7 @@ fn overlay_signature(state: &DashboardState) -> OverlaySignature {
         Vec::new()
     };
     OverlaySignature {
+        active_modal_popup_kind: state.active_modal_popup_kind(),
         leader_active,
         leader_action_mode: state.is_leader_action_mode(),
         leader_title: leader_active.then(|| state.leader_keymap_title()),
@@ -729,7 +731,8 @@ pub(in crate::tui) fn should_refresh_image_protocols_after_visible_signature_cha
     after: &VisibleDashboardSignature,
     image_surfaces_visible: bool,
 ) -> bool {
-    image_surfaces_visible && before.overlay != after.overlay
+    image_surfaces_visible
+        && before.overlay.active_modal_popup_kind != after.overlay.active_modal_popup_kind
 }
 
 pub(super) fn image_surfaces_visible(
