@@ -12,7 +12,8 @@ use super::{
     ActivityInfo, AttachmentUpdate, ChannelInfo, CustomEmojiInfo, EmbedInfo, GuildFolder,
     GuildNotificationSettingsInfo, MemberInfo, MentionInfo, MessageInfo, PollInfo, PresenceStatus,
     ReactionUsersInfo, ReadStateInfo, RelationshipInfo, RoleInfo, SnapshotAreas, UserProfileInfo,
-    VoiceConnectionStatus, VoiceServerInfo, VoiceSoundKind, VoiceStateInfo, is_thread_kind,
+    UserSettingsInfo, VoiceConnectionStatus, VoiceServerInfo, VoiceSoundKind, VoiceStateInfo,
+    is_thread_kind,
 };
 
 #[cfg(test)]
@@ -322,6 +323,9 @@ pub enum AppEvent {
     GuildFoldersUpdate {
         folders: Vec<GuildFolder>,
     },
+    UserSettingsUpdate {
+        settings: UserSettingsInfo,
+    },
     UserGuildNotificationSettingsInit {
         settings: Vec<GuildNotificationSettingsInfo>,
     },
@@ -491,6 +495,7 @@ define_app_event_kinds! {
     CurrentUserPollVoteUpdate: AppEvent::CurrentUserPollVoteUpdate { .. },
     ReactionUsersLoaded: AppEvent::ReactionUsersLoaded { .. },
     GuildFoldersUpdate: AppEvent::GuildFoldersUpdate { .. },
+    UserSettingsUpdate: AppEvent::UserSettingsUpdate { .. },
     UserGuildNotificationSettingsInit: AppEvent::UserGuildNotificationSettingsInit { .. },
     UserGuildNotificationSettingsUpdate: AppEvent::UserGuildNotificationSettingsUpdate { .. },
     GatewayError: AppEvent::GatewayError { .. },
@@ -739,6 +744,7 @@ impl AppEventKind {
             | AppEventKind::VoiceSpeakingUpdate
             | AppEventKind::TypingStart
             | AppEventKind::GuildFoldersUpdate
+            | AppEventKind::UserSettingsUpdate
             | AppEventKind::UserNoteLoaded
             | AppEventKind::UserGuildNotificationSettingsInit
             | AppEventKind::UserGuildNotificationSettingsUpdate => {

@@ -20,12 +20,12 @@ use crate::discord::{
     ActivityInfo, ActivityKind, AppCommand, AppEvent, AttachmentInfo, ChannelInfo,
     ChannelNotificationOverrideInfo, ChannelRecipientInfo, ChannelUnreadState,
     ChannelVisibilityStats, CustomEmojiInfo, DiscordState, DownloadAttachmentSource,
-    EmbedFieldInfo, EmbedInfo, ForumPostArchiveState, GuildNotificationSettingsInfo,
+    EmbedFieldInfo, EmbedInfo, ForumPostArchiveState, GuildFolder, GuildNotificationSettingsInfo,
     MessageAttachmentUpload, MessageInfo, MessageKind, MessageReferenceInfo, MessageSearchPage,
     MessageSnapshotInfo, MessageState, MessageUpdateEventFields, NotificationLevel,
     PermissionOverwriteInfo, PermissionOverwriteKind, PresenceStatus, ReactionEmoji, ReactionInfo,
     ReactionUserInfo, ReactionUsersInfo, ReplyInfo, RoleInfo, SnapshotRevision, UserProfileInfo,
-    VoiceConnectionStatus, VoiceStateInfo,
+    UserSettingsInfo, VoiceConnectionStatus, VoiceStateInfo,
 };
 
 mod channel_switcher;

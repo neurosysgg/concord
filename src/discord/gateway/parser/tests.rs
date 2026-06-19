@@ -3092,6 +3092,93 @@ fn user_guild_settings_update_emits_single_update_event() {
 }
 
 #[test]
+fn user_settings_update_emits_guild_folder_order() {
+    let events = parse_user_account_event(
+        &json!({
+            "t": "USER_SETTINGS_UPDATE",
+            "d": {
+                "activity_restricted_guild_ids": ["40"],
+                "custom_status": {
+                    "text": "working",
+                    "emoji_id": "50",
+                    "expires_at": null
+                },
+                "friend_source_flags": {
+                    "all": true,
+                    "mutual_friends": false,
+                    "mutual_guilds": true
+                },
+                "guild_folders": [
+                    {
+                        "id": null,
+                        "name": null,
+                        "color": null,
+                        "guild_ids": ["20"]
+                    },
+                    {
+                        "id": 42,
+                        "name": "work",
+                        "color": 16711680,
+                        "guild_ids": ["10", "30"]
+                    }
+                ],
+                "status": "online",
+                "theme": "dark",
+                "future_setting": { "preserved": true }
+            }
+        })
+        .to_string(),
+    );
+
+    match events.as_slice() {
+        [AppEvent::UserSettingsUpdate { settings }] => {
+            assert_eq!(
+                settings.activity_restricted_guild_ids,
+                Some(vec![Id::new(40)])
+            );
+            assert_eq!(settings.status.as_deref(), Some("online"));
+            assert_eq!(settings.theme.as_deref(), Some("dark"));
+            assert_eq!(
+                settings
+                    .custom_status
+                    .as_ref()
+                    .and_then(Option::as_ref)
+                    .and_then(|status| status.text.as_deref()),
+                Some("working")
+            );
+            assert_eq!(
+                settings
+                    .custom_status
+                    .as_ref()
+                    .and_then(Option::as_ref)
+                    .and_then(|status| status.emoji_id),
+                Some(Id::new(50))
+            );
+            assert_eq!(
+                settings
+                    .friend_source_flags
+                    .as_ref()
+                    .and_then(|flags| flags.all),
+                Some(true)
+            );
+            assert!(settings.extra_fields.contains_key("future_setting"));
+            let folders = settings
+                .guild_folders
+                .as_ref()
+                .expect("user settings update should keep guild folders");
+            assert_eq!(folders.len(), 2);
+            assert_eq!(folders[0].id, None);
+            assert_eq!(folders[0].guild_ids, vec![Id::new(20)]);
+            assert_eq!(folders[1].id, Some(42));
+            assert_eq!(folders[1].name.as_deref(), Some("work"));
+            assert_eq!(folders[1].color, Some(16_711_680));
+            assert_eq!(folders[1].guild_ids, vec![Id::new(10), Id::new(30)]);
+        }
+        other => panic!("expected one UserSettingsUpdate, got {other:?}"),
+    }
+}
+
+#[test]
 fn ready_payload_parses_private_channel_notification_settings() {
     let events = parse_user_account_event(
         &json!({

@@ -10,6 +10,7 @@ mod presence;
 mod ready;
 mod relationships;
 mod shared;
+mod user_settings;
 mod voice;
 
 pub(crate) use channels::parse_channel_info;
@@ -33,6 +34,7 @@ use messages::{
 use presence::{parse_presence_update, parse_typing_start};
 use ready::{parse_ready, parse_ready_supplemental};
 use relationships::{parse_relationship_add, parse_relationship_remove, parse_relationship_update};
+use user_settings::parse_user_settings_update;
 use voice::{parse_guild_voice_states, parse_voice_server_update, parse_voice_state_update};
 
 /// Best-effort fallback that rebuilds the dashboard's domain events directly
@@ -89,6 +91,7 @@ pub(super) fn parse_user_account_event(raw: &str) -> Vec<AppEvent> {
         "USER_GUILD_SETTINGS_UPDATE" => {
             parse_user_guild_settings_update(data).into_iter().collect()
         }
+        "USER_SETTINGS_UPDATE" => parse_user_settings_update(data).into_iter().collect(),
         "GUILD_MEMBER_ADD" => parse_member_add(data).into_iter().collect(),
         "GUILD_MEMBER_UPDATE" => parse_member_upsert(data).into_iter().collect(),
         "GUILD_MEMBER_LIST_UPDATE" => parse_member_list_update(data),

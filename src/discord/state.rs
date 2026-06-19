@@ -882,6 +882,11 @@ impl DiscordState {
             AppEvent::GuildFoldersUpdate { folders } => {
                 self.navigation.guild_folders = folders.clone();
             }
+            AppEvent::UserSettingsUpdate { settings } => {
+                if let Some(folders) = &settings.guild_folders {
+                    self.navigation.guild_folders = folders.clone();
+                }
+            }
             AppEvent::UserProfileLoaded { .. } => self.apply_user_profile_loaded_event(event),
             AppEvent::UserNoteLoaded { user_id, note } => {
                 self.profiles.fetched_notes.insert(*user_id, note.clone());

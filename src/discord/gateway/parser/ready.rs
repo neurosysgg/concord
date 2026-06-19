@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use crate::discord::{
-    ChannelInfo, ChannelRecipientInfo, GuildFolder, PresenceStatus, ReadStateInfo,
-    RelationshipInfo, RoleInfo,
+    ChannelInfo, ChannelRecipientInfo, PresenceStatus, ReadStateInfo, RelationshipInfo, RoleInfo,
     events::{AppEvent, PresenceEventFields},
     ids::{
         Id,
@@ -22,6 +21,7 @@ use super::{
     presence::parse_presence_entry,
     relationships::parse_relationship_entry,
     shared::{display_name_from_parts_or_unknown, parse_id, parse_status},
+    user_settings::parse_user_settings_info,
     voice::parse_guild_voice_states,
 };
 
@@ -158,15 +158,8 @@ pub(super) fn parse_ready(data: &Value) -> Vec<AppEvent> {
     // payload. The modern `user_settings_proto` blob is base64+protobuf and is
     // skipped for now. When present, every guild appears in some folder, either
     // an explicit one or a single-guild "container" with `id == null`.
-    if let Some(folders) = data
-        .get("user_settings")
-        .and_then(|settings| settings.get("guild_folders"))
-        .and_then(Value::as_array)
-    {
-        let folders: Vec<GuildFolder> = folders.iter().filter_map(parse_guild_folder).collect();
-        if !folders.is_empty() {
-            events.push(AppEvent::GuildFoldersUpdate { folders });
-        }
+    if let Some(settings) = data.get("user_settings").and_then(parse_user_settings_info) {
+        events.push(AppEvent::UserSettingsUpdate { settings });
     }
 
     events
@@ -270,33 +263,6 @@ fn guild_member_upsert_events(guild_id: Id<GuildMarker>, members: &[Value]) -> V
         .filter_map(|member| parse_member_info(member, Some(guild_id)))
         .map(|member| AppEvent::GuildMemberUpsert { guild_id, member })
         .collect()
-}
-
-fn parse_guild_folder(value: &Value) -> Option<GuildFolder> {
-    let guild_ids: Vec<Id<GuildMarker>> = value
-        .get("guild_ids")?
-        .as_array()?
-        .iter()
-        .filter_map(parse_id::<GuildMarker>)
-        .collect();
-    if guild_ids.is_empty() {
-        return None;
-    }
-
-    let id = value.get("id").and_then(Value::as_u64);
-    let name = value
-        .get("name")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned);
-    let color = value.get("color").and_then(Value::as_u64).map(|c| c as u32);
-
-    Some(GuildFolder {
-        id,
-        name,
-        color,
-        guild_ids,
-    })
 }
 
 type MergedPresences = BTreeMap<Id<UserMarker>, PresenceEventFields>;

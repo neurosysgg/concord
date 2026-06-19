@@ -23,6 +23,7 @@ mod request_lifecycle;
 mod rest;
 mod state;
 mod upload;
+mod user_settings;
 mod voice;
 
 pub use application_commands::{
@@ -83,4 +84,5 @@ pub use state::{
     VoiceParticipantState,
 };
 pub(crate) use upload::read_profile_avatar_image;
+pub use user_settings::{UserCustomStatusInfo, UserFriendSourceFlagsInfo, UserSettingsInfo};
 pub use voice::{VoiceConnectionStatus, VoiceServerInfo, VoiceSoundKind, VoiceStateInfo};
