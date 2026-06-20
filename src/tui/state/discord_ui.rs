@@ -9,7 +9,7 @@ use crate::discord::ids::{
 };
 use crate::discord::{
     AppEvent, ApplicationCommandInfo, ChannelUnreadState, DiscordSnapshot, DiscordState,
-    SnapshotAreas, SnapshotRevision,
+    MessageInfo, SnapshotAreas, SnapshotRevision,
 };
 
 use super::{DashboardState, DesktopNotification, message_notification_body};
@@ -190,10 +190,7 @@ impl DashboardState {
         let AppEvent::MessageCreate { message } = event else {
             return None;
         };
-        if !self.desktop_notifications_enabled()
-            || (self.terminal_focused()
-                && self.navigation.channels.active_channel_id == Some(message.channel_id))
-        {
+        if !self.desktop_notifications_enabled() || self.message_notification_suppressed(message) {
             return None;
         }
         if !self
@@ -224,6 +221,23 @@ impl DashboardState {
             message.embeds.len(),
         );
         Some(DesktopNotification { title, body })
+    }
+
+    pub(crate) fn notification_sound_for_event(&self, event: &AppEvent) -> bool {
+        let AppEvent::MessageCreate { message } = event else {
+            return false;
+        };
+        self.desktop_notifications_enabled()
+            && !self.message_notification_suppressed(message)
+            && self
+                .discord
+                .cache
+                .message_event_triggers_notification(event)
+    }
+
+    fn message_notification_suppressed(&self, message: &MessageInfo) -> bool {
+        self.terminal_focused()
+            && self.navigation.channels.active_channel_id == Some(message.channel_id)
     }
 }
 

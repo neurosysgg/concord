@@ -102,3 +102,35 @@ fn desktop_notification_for_event_respects_notification_opt_out() {
 
     assert!(state.desktop_notification_for_event(&event).is_none());
 }
+
+#[test]
+fn notification_sound_for_event_respects_notification_opt_out() {
+    let mut state = state_with_hidden_and_visible_channels();
+    let channel_id = Id::new(3);
+    state.push_event(user_guild_settings_init(vec![
+        GuildNotificationSettingsInfo {
+            message_notifications: Some(NotificationLevel::AllMessages),
+            ..GuildNotificationSettingsInfo::test(Some(Id::new(1)))
+        },
+    ]));
+    state.options.notification_options.desktop_notifications = false;
+    let event = notification_message_event(channel_id, "hello");
+
+    assert!(state.desktop_notification_for_event(&event).is_none());
+    assert!(!state.notification_sound_for_event(&event));
+}
+
+#[test]
+fn notification_sound_for_event_suppresses_active_channel() {
+    let mut state = state_with_writable_channel();
+    let channel_id = Id::new(2);
+    state.push_event(user_guild_settings_init(vec![
+        GuildNotificationSettingsInfo {
+            message_notifications: Some(NotificationLevel::AllMessages),
+            ..GuildNotificationSettingsInfo::test(Some(Id::new(1)))
+        },
+    ]));
+    let event = notification_message_event(channel_id, "hello");
+
+    assert!(!state.notification_sound_for_event(&event));
+}

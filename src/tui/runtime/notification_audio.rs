@@ -23,6 +23,8 @@ const GENERATED_VOICE_SOUND_SAMPLE_RATE: u32 = 48_000;
 const GENERATED_VOICE_SOUND_CHANNELS: u16 = 2;
 #[cfg(any(test, feature = "voice-playback"))]
 const GENERATED_VOICE_SOUND_DURATION: Duration = Duration::from_millis(180);
+#[cfg(any(test, feature = "voice-playback"))]
+const GENERATED_NOTIFICATION_SOUND_DURATION: Duration = Duration::from_millis(140);
 #[cfg(feature = "voice-playback")]
 const NOTIFICATION_SOUND_STREAM_PADDING: Duration = Duration::from_millis(40);
 #[cfg(feature = "voice-playback")]
@@ -50,6 +52,17 @@ pub(super) fn play_voice_sound(
     let audio = match custom_path {
         Some(path) => load_notification_wav(path)?,
         None => generated_voice_sound(kind),
+    };
+    play_notification_audio(audio)
+}
+
+#[cfg(feature = "voice-playback")]
+pub(super) fn play_notification_sound(
+    custom_path: Option<&Path>,
+) -> std::result::Result<(), String> {
+    let audio = match custom_path {
+        Some(path) => load_notification_wav(path)?,
+        None => generated_notification_sound(),
     };
     play_notification_audio(audio)
 }
@@ -254,6 +267,28 @@ fn generated_voice_sound(kind: VoiceSoundKind) -> NotificationAudio {
 }
 
 #[cfg(any(test, feature = "voice-playback"))]
+fn generated_notification_sound() -> NotificationAudio {
+    let frame_count = (GENERATED_VOICE_SOUND_SAMPLE_RATE as f32
+        * GENERATED_NOTIFICATION_SOUND_DURATION.as_secs_f32()) as usize;
+    let mut samples = Vec::with_capacity(frame_count * usize::from(GENERATED_VOICE_SOUND_CHANNELS));
+    for frame in 0..frame_count {
+        let progress = frame as f32 / frame_count.max(1) as f32;
+        let frequency = generated_notification_sound_frequency(progress);
+        let phase = frame as f32 * frequency * std::f32::consts::TAU
+            / GENERATED_VOICE_SOUND_SAMPLE_RATE as f32;
+        let envelope = generated_voice_sound_envelope(progress);
+        let sample = phase.sin() * 0.16 * envelope;
+        samples.push(sample);
+        samples.push(sample);
+    }
+    NotificationAudio {
+        sample_rate: GENERATED_VOICE_SOUND_SAMPLE_RATE,
+        channels: GENERATED_VOICE_SOUND_CHANNELS,
+        samples,
+    }
+}
+
+#[cfg(any(test, feature = "voice-playback"))]
 fn generated_voice_sound_frequency(kind: VoiceSoundKind, progress: f32) -> f32 {
     match (kind, progress < 0.5) {
         (VoiceSoundKind::Join, true) => 660.0,
@@ -261,6 +296,11 @@ fn generated_voice_sound_frequency(kind: VoiceSoundKind, progress: f32) -> f32 {
         (VoiceSoundKind::Leave, true) => 880.0,
         (VoiceSoundKind::Leave, false) => 660.0,
     }
+}
+
+#[cfg(any(test, feature = "voice-playback"))]
+fn generated_notification_sound_frequency(progress: f32) -> f32 {
+    if progress < 0.45 { 1046.5 } else { 1318.5 }
 }
 
 #[cfg(any(test, feature = "voice-playback"))]
@@ -425,6 +465,21 @@ mod tests {
         assert_ne!(
             generated_voice_sound_frequency(VoiceSoundKind::Join, 0.25),
             generated_voice_sound_frequency(VoiceSoundKind::Leave, 0.25)
+        );
+    }
+
+    #[test]
+    fn generated_notification_sound_has_stereo_samples() {
+        let message = generated_notification_sound();
+        let join = generated_voice_sound(VoiceSoundKind::Join);
+
+        assert_eq!(message.sample_rate, GENERATED_VOICE_SOUND_SAMPLE_RATE);
+        assert_eq!(message.channels, GENERATED_VOICE_SOUND_CHANNELS);
+        assert_eq!(message.samples.len() % usize::from(message.channels), 0);
+        assert_ne!(message.samples.len(), join.samples.len());
+        assert_ne!(
+            generated_notification_sound_frequency(0.25),
+            generated_voice_sound_frequency(VoiceSoundKind::Join, 0.25)
         );
     }
 

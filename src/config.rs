@@ -55,6 +55,8 @@ pub struct NotificationOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notification_icon: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub notification_sound: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub voice_join_sound: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub voice_leave_sound: Option<PathBuf>,
@@ -353,6 +355,7 @@ impl Default for NotificationOptions {
         Self {
             desktop_notifications: true,
             notification_icon: None,
+            notification_sound: None,
             voice_join_sound: None,
             voice_leave_sound: None,
         }
@@ -632,6 +635,15 @@ mod tests {
                 MicrophoneSensitivityDb::default(),
             ),
             (
+                "[notifications]\nnotification_sound = \"/tmp/message.wav\"\n",
+                false,
+                ImagePreviewQualityPreset::Balanced,
+                false,
+                false,
+                false,
+                MicrophoneSensitivityDb::default(),
+            ),
+            (
                 "[composer]\nemojis_as_links = true\n",
                 false,
                 ImagePreviewQualityPreset::Balanced,
@@ -674,6 +686,14 @@ mod tests {
                 config.notifications.desktop_notifications,
                 expected_desktop_notifications
             );
+            if toml.contains("notification_sound") {
+                assert_eq!(
+                    config.notifications.notification_sound.as_deref(),
+                    Some(std::path::Path::new("/tmp/message.wav"))
+                );
+            } else {
+                assert!(config.notifications.notification_sound.is_none());
+            }
             if toml.contains("voice_join_sound") {
                 assert_eq!(
                     config.notifications.voice_join_sound.as_deref(),
@@ -870,6 +890,7 @@ mod tests {
             notifications: NotificationOptions {
                 desktop_notifications: false,
                 notification_icon: Some("/tmp/icon.svg".to_string()),
+                notification_sound: Some(std::path::PathBuf::from("/tmp/message.wav")),
                 voice_join_sound: Some(std::path::PathBuf::from("/tmp/join.wav")),
                 voice_leave_sound: Some(std::path::PathBuf::from("/tmp/leave.wav")),
             },

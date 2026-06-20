@@ -250,12 +250,10 @@ YouTube playback depends on your local `mpv` setup, such as `yt-dlp` support.
 
 ### Notifications
 
-- Desktop notifications for Discord messages that pass your Discord
+- You can configure custom WAV files
+- Desktop notifications for messages that pass your Discord
   notification settings
-- Active channel notifications are suppressed so Concord does not notify for
-  the conversation you are already viewing
-- Voice join and leave notification sounds while you are connected to voice.
-  You can keep the built-in tones or configure custom WAV files.
+- Voice join and leave notification sounds while you are connected to voice
 
 ### Navigation & Keyboard shortcuts
 
@@ -469,8 +467,9 @@ desktop_notifications = true
 # or a path to an icon.
 notification_icon = "/path/to/icon.svg"
 
-# Optional WAV files for voice join and leave notification sounds.
+# Optional WAV files for message, voice join/leave notification sounds.
 # When unset, Concord uses built-in generated tones.
+notification_sound = "/path/to/message.wav"
 voice_join_sound = "/path/to/join.wav"
 voice_leave_sound = "/path/to/leave.wav"
 

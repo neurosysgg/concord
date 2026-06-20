@@ -125,6 +125,9 @@ fn dispatch_runtime_side_effects(event: &AppEvent, ctx: &EffectContext<'_>) {
     if let Some(notification) = ctx.state.desktop_notification_for_event(event) {
         dispatch_desktop_notification(notification, ctx.state.desktop_notification_icon());
     }
+    if ctx.state.notification_sound_for_event(event) {
+        dispatch_notification_sound(ctx.state.notification_options());
+    }
     if let AppEvent::VoiceSound { kind } = event {
         dispatch_voice_sound(*kind, ctx.state.notification_options());
     }
@@ -189,46 +192,39 @@ fn enqueue_missing_thread_owner_requests(
 }
 
 fn dispatch_desktop_notification(notification: DesktopNotification, icon: Option<String>) {
-    tokio::spawn(async move {
-        let title = notification.title;
-        let body = notification.body;
-        let result = tokio::task::spawn_blocking(move || {
-            deliver_desktop_notification(&title, &body, icon.as_deref())
-        })
-        .await;
-
-        match result {
-            Ok(Ok(())) => {}
-            Ok(Err(error)) => {
-                log_notification_failure_once(
-                    "notification",
-                    format!("desktop notification failed: {error}"),
-                );
-                ring_terminal_bell();
-            }
-            Err(error) => {
-                log_notification_failure_once(
-                    "notification",
-                    format!("desktop notification task failed: {error}"),
-                );
-                ring_terminal_bell();
-            }
-        }
+    let title = notification.title;
+    let body = notification.body;
+    spawn_notification_task("notification", "desktop notification", move || {
+        deliver_desktop_notification(&title, &body, icon.as_deref())
     });
 }
 
 fn dispatch_voice_sound(kind: VoiceSoundKind, notification_options: NotificationOptions) {
+    spawn_notification_task("voice", "voice sound", move || {
+        play_voice_sound(kind, notification_options)
+    });
+}
+
+fn dispatch_notification_sound(notification_options: NotificationOptions) {
+    spawn_notification_task("notification", "message sound", move || {
+        play_notification_sound(notification_options)
+    });
+}
+
+fn spawn_notification_task<F>(target: &'static str, action: &'static str, task: F)
+where
+    F: FnOnce() -> std::result::Result<(), String> + Send + 'static,
+{
     tokio::spawn(async move {
-        let result =
-            tokio::task::spawn_blocking(move || play_voice_sound(kind, notification_options)).await;
+        let result = tokio::task::spawn_blocking(task).await;
         match result {
             Ok(Ok(())) => {}
             Ok(Err(error)) => {
-                log_notification_failure_once("voice", format!("voice sound failed: {error}"));
+                log_notification_failure_once(target, format!("{action} failed: {error}"));
                 ring_terminal_bell();
             }
             Err(error) => {
-                log_notification_failure_once("voice", format!("voice sound task failed: {error}"));
+                log_notification_failure_once(target, format!("{action} task failed: {error}"));
                 ring_terminal_bell();
             }
         }
@@ -267,6 +263,22 @@ fn play_voice_sound(
     }
 }
 
+fn play_notification_sound(
+    notification_options: NotificationOptions,
+) -> std::result::Result<(), String> {
+    let custom_path = notification_options.notification_sound.as_deref();
+    #[cfg(feature = "voice-playback")]
+    {
+        super::notification_audio::play_notification_sound(custom_path)
+    }
+    #[cfg(not(feature = "voice-playback"))]
+    {
+        let _ = custom_path;
+        ring_terminal_bell();
+        Ok(())
+    }
+}
+
 fn voice_sound_path(kind: VoiceSoundKind, options: &NotificationOptions) -> Option<&Path> {
     match kind {
         VoiceSoundKind::Join => options.voice_join_sound.as_deref(),
@@ -286,8 +298,8 @@ fn deliver_notify_rust_notification(
     if let Some(icon) = icon {
         notification.icon(icon);
     }
-    #[cfg(target_os = "macos")]
-    notification.sound_name("Ping");
+    #[cfg(all(unix, not(target_os = "macos")))]
+    notification.hint(notify_rust::Hint::SuppressSound(true));
     notification
         .summary(title)
         .body(body)
