@@ -281,7 +281,7 @@ With default vim-style navigation:
 | `Enter`                                   | Open or activate the selected item              |
 | `/`                                       | Filter Guilds/Channels, search Messages/Members |
 | `Space`                                   | Open leader shortcut window                     |
-| `i`                                       | Text insert mode, or forum post composer       |
+| `i`                                       | Text insert mode, or forum post composer        |
 | `Esc` / `q`                               | Close popup, cancel mode, or go back            |
 | `q`                                       | Quit Concord                                    |
 
@@ -381,11 +381,7 @@ You can paste copied files into the composer to attach them. Pending uploads
 are shown above the input before sending.
 
 In a forum or media parent channel, the same composer key opens a post composer
-overlay instead of the bottom message input. The overlay has separate title,
-body, attachment, and tag sections. Use `Tab` / `Shift+Tab` to select a section,
-`Enter` to edit title/body, choose attachments to remove, or toggle a tag, and
-`s` to create the post. Paste files or images while editing the body to attach
-them, like the normal composer.
+overlay.
 
 | Shortcut                                     | Action            | Description                                                      |
 | -------------------------------------------- | ----------------- | ---------------------------------------------------------------- |
