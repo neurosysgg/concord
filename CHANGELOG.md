@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.2.4] - 2026-06-20
+## [2.2.5] - 2026-06-21
+
+### Documentation
+
+- Update readme by @chojs23
+
+### Features
+
+- Add guild folder settings by @chojs23
+- Use custom notification sound instead of system generated sound by @chojs23
+- Add create post by @chojs23
+- Add composer attachment preview by @chojs23
+
+## [2.2.4] - 2026-06-19
 
 ### Bug Fixes
 
