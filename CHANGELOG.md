@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.6] - 2026-06-21
+
+### Features
+
+- Image protocol pref (#209) in [#209](https://github.com/chojs23/concord/pull/209) by @chojs23
+
 ## [2.2.5] - 2026-06-21
 
 ### Documentation
