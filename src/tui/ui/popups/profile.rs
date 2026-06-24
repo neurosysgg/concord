@@ -95,7 +95,7 @@ const USER_PROFILE_POPUP_HEIGHT: u16 = 24;
 /// Centered popup rect inside the messages area. Shared so the geometry
 /// computation lives in one place and the scroll-clamping pass uses the
 /// exact same width/height the renderer ends up drawing into.
-pub(in crate::tui::ui) fn user_profile_popup_area(area: Rect) -> Rect {
+pub(in crate::tui) fn user_profile_popup_area(area: Rect) -> Rect {
     let width = USER_PROFILE_POPUP_WIDTH
         .min(area.width.saturating_sub(2))
         .max(8);

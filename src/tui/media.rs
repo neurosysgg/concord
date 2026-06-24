@@ -10,6 +10,7 @@ pub(super) use avatar::AvatarImageCache;
 pub(super) use decode::{MediaImageDecodeKey, MediaImageDecodeResult, spawn_media_image_decode};
 pub(super) use emoji::EmojiImageCache;
 pub(super) use preview::ImagePreviewCache;
+pub(in crate::tui) use preview::ImagePreviewKey;
 #[cfg(test)]
 use targets::image_preview_height_for_dimensions;
 pub(super) use targets::{

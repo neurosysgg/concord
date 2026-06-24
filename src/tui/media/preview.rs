@@ -439,7 +439,7 @@ fn clipped_preview_stateful_protocol(
 }
 
 impl ImagePreviewTarget {
-    pub(super) fn key(&self) -> ImagePreviewKey {
+    pub(in crate::tui) fn key(&self) -> ImagePreviewKey {
         ImagePreviewKey {
             viewer: self.viewer,
             message_id: self.message_id,

@@ -72,9 +72,10 @@ pub(super) use options::{options_popup_area, render_options_popup};
 #[cfg(test)]
 pub(super) use polls::poll_vote_picker_lines;
 pub(super) use polls::{poll_vote_picker_popup_area, render_poll_vote_picker};
+pub(in crate::tui) use profile::user_profile_popup_area;
 pub(super) use profile::{
-    render_user_profile_popup, user_profile_popup_area, user_profile_popup_has_avatar,
-    user_profile_popup_text_geometry, user_profile_popup_total_lines,
+    render_user_profile_popup, user_profile_popup_has_avatar, user_profile_popup_text_geometry,
+    user_profile_popup_total_lines,
 };
 #[cfg(test)]
 pub(super) use profile::{user_profile_popup_lines, user_profile_popup_lines_with_activities};

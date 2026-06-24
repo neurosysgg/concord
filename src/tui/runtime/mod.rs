@@ -21,6 +21,7 @@ pub(super) mod effects;
 pub(super) mod events;
 mod media_runtime;
 pub(super) mod notification_audio;
+mod placement;
 mod redraw_gate;
 mod scheduler;
 
@@ -110,30 +111,27 @@ pub(super) async fn run_dashboard(
     // Fingerprint of the last drawn frame's background-visible state. Background
     // events only schedule a redraw when this moves (see `redraw_gate`).
     let mut last_view_signature = redraw_gate::view_signature(&state);
-    // Tracks where images sit on screen. When it changes between draws an image
-    // has moved or been covered/uncovered, and terminal graphics are a pixel
-    // layer the cell diff cannot erase on its own, so we paint one image-free
-    // frame first to overwrite the stale pixels before redrawing (see
-    // `image_layout_signature`). Plain typing/idle never changes it, so they
-    // draw a single frame and never blink.
-    let mut last_image_layout = u64::MAX;
-
     while !state.should_quit() {
         if dirty {
             let size = terminal.size()?;
-            let image_layout = redraw_gate::image_layout_signature(
-                &state,
-                Rect::new(0, 0, size.width, size.height),
-            );
-            if image_layout != last_image_layout {
+            let area = Rect::new(0, 0, size.width, size.height);
+            // Resolve where every overlay image lands this frame and diff it
+            // against the last frame. Terminal graphics are a pixel layer the
+            // cell diff cannot erase on its own, so when an overlay moved or
+            // disappeared we draw one frame that keeps only the unchanged
+            // overlays (overpainting the stale pixels) before the real frame.
+            // When nothing moved we draw a single frame and never blink.
+            media_runtime.prepare_frame(&mut state, area);
+            if media_runtime.need_clear() {
                 terminal.draw(|frame| {
-                    last_frame_area = clear_image_surfaces_frame(frame, &mut state);
+                    last_frame_area =
+                        clear_image_surfaces_frame(frame, &mut state, &mut media_runtime);
                 })?;
-                last_image_layout = image_layout;
             }
             terminal.draw(|frame| {
                 last_frame_area = draw_dashboard_frame(frame, &mut state, &mut media_runtime);
             })?;
+            media_runtime.commit_placements();
             dirty = false;
             last_view_signature = redraw_gate::view_signature(&state);
 

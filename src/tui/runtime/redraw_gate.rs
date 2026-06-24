@@ -18,8 +18,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::fmt::{self, Write as _};
 use std::hash::{Hash as _, Hasher as _};
 
-use ratatui::layout::Rect;
-
 use crate::tui::state::DashboardState;
 
 /// Hash a value's `Debug` output into the running hasher. Lets us fingerprint
@@ -121,75 +119,11 @@ pub(super) fn view_signature(state: &DashboardState) -> u64 {
     hasher.finish()
 }
 
-/// Fingerprint of everything that determines WHERE images sit on screen, and
-/// whether a modal covers them: the terminal area, every scroll/selection
-/// offset, the visible content whose length shifts the rows below it, and which
-/// popup is open. When this changes between drawn frames an image has moved or
-/// been covered/uncovered. Terminal graphics are a pixel layer that the cell
-/// diff cannot erase by itself (and kitty placements survive plain overwrites),
-/// so the caller draws one image-free frame first to repaint those cells before
-/// the images are redrawn. Composer/popup *text* is deliberately excluded so
-/// plain typing (which does not move images) never triggers that extra frame.
-pub(super) fn image_layout_signature(state: &DashboardState, area: Rect) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    hash_dbg(&mut hasher, &area);
-
-    // Message pane: vertical scroll, selection, and the content whose wrapping
-    // and count shift every image below it.
-    hash_dbg(&mut hasher, &state.message_pane_source());
-    hash_dbg(&mut hasher, &state.selected_guild_id());
-    hash_dbg(&mut hasher, &state.selected_channel_id());
-    state.selected_message().hash(&mut hasher);
-    state.message_scroll().hash(&mut hasher);
-    state.message_line_scroll().hash(&mut hasher);
-    state.new_messages_count().hash(&mut hasher);
-    // Only whether the typing strip is shown matters for layout, not its text.
-    state
-        .typing_footer_for_selected_channel()
-        .is_some()
-        .hash(&mut hasher);
-    hash_dbg(&mut hasher, &state.visible_messages());
-    hash_dbg(&mut hasher, &state.visible_thread_card_items());
-
-    // Member pane and sidebars: scroll offsets, roster order, and entries all
-    // move the avatars/emoji rendered in them.
-    state.member_horizontal_scroll().hash(&mut hasher);
-    state.guild_horizontal_scroll().hash(&mut hasher);
-    state.channel_horizontal_scroll().hash(&mut hasher);
-    let member_start = state.member_scroll();
-    for entry in state
-        .flattened_members()
-        .into_iter()
-        .skip(member_start)
-        .take(state.member_content_height())
-    {
-        hash_dbg(&mut hasher, &(entry.user_id(), entry.status()));
-    }
-    hash_dbg(&mut hasher, &state.visible_guild_pane_entries());
-    hash_dbg(&mut hasher, &state.visible_channel_pane_entries());
-
-    // Overlays cover/uncover images; popup scroll moves images inside them.
-    hash_dbg(&mut hasher, &state.active_modal_popup_kind());
-    hash_dbg(&mut hasher, &state.leader_keymap_prefix());
-    state.is_leader_action_mode().hash(&mut hasher);
-    state.is_any_action_context_active().hash(&mut hasher);
-    state
-        .user_profile_popup_has_avatar_preview()
-        .hash(&mut hasher);
-    state.user_profile_popup_scroll().hash(&mut hasher);
-
-    hasher.finish()
-}
-
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use super::{image_layout_signature, view_signature};
+    use super::view_signature;
     use crate::discord::AppEvent;
-    use crate::tui::keybindings::KeyChord;
     use crate::tui::state::DashboardState;
-    use ratatui::layout::Rect;
 
     #[test]
     fn view_signature_is_stable_and_tracks_visible_changes() {
@@ -205,34 +139,5 @@ mod tests {
             latest_version: "9.9.9".to_owned(),
         });
         assert_ne!(before, view_signature(&state));
-    }
-
-    #[test]
-    fn image_layout_signature_is_stable_and_tracks_repositioning() {
-        let state = DashboardState::new();
-        let area = Rect::new(0, 0, 80, 24);
-        // Stable for unchanged state + area, so steady frames draw no extra
-        // image-free frame.
-        assert_eq!(
-            image_layout_signature(&state, area),
-            image_layout_signature(&state, area)
-        );
-        // A resize repositions every image, so the signature must move.
-        assert_ne!(
-            image_layout_signature(&state, area),
-            image_layout_signature(&state, Rect::new(0, 0, 100, 24))
-        );
-    }
-
-    #[test]
-    fn image_layout_signature_tracks_leader_popup_geometry_context() {
-        let area = Rect::new(0, 0, 80, 24);
-        let mut state = DashboardState::new();
-        state.open_leader();
-        let before = image_layout_signature(&state, area);
-
-        state.push_leader_keymap_key(KeyChord::from_str("v").expect("v should parse"));
-
-        assert_ne!(before, image_layout_signature(&state, area));
     }
 }

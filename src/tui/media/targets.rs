@@ -74,6 +74,24 @@ pub(in crate::tui) struct AvatarTarget {
     pub(super) url: String,
 }
 
+impl AvatarTarget {
+    pub(in crate::tui) fn row(&self) -> isize {
+        self.row
+    }
+
+    pub(in crate::tui) fn visible_height(&self) -> u16 {
+        self.visible_height
+    }
+
+    pub(in crate::tui) fn top_clip_rows(&self) -> u16 {
+        self.top_clip_rows
+    }
+
+    pub(in crate::tui) fn url(&self) -> &str {
+        &self.url
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::tui) struct EmojiImageTarget {
     pub(super) url: String,

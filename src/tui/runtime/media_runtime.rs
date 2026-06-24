@@ -23,6 +23,7 @@ use crate::{
 };
 
 use super::effects as effect_helpers;
+use super::placement::{FramePlacements, PlacementDiff};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum LocalUploadPreviewOwner {
@@ -46,6 +47,14 @@ pub(super) struct DashboardMediaRuntime {
     image_targets: Vec<ImagePreviewTarget>,
     avatar_targets: Vec<AvatarTarget>,
     emoji_targets: Vec<EmojiImageTarget>,
+    // Where overlay images sat last frame, so `prepare_frame` can tell which
+    // moved/disappeared and need the selective clear pass.
+    last_placements: FramePlacements,
+    current_placements: FramePlacements,
+    placement_diff: PlacementDiff,
+    // The profile popup avatar isn't a message-pane target, so its resolved url
+    // is carried from `prepare_frame` into the draw closures.
+    popup_avatar_url: Option<String>,
 }
 
 impl DashboardMediaRuntime {
@@ -62,6 +71,10 @@ impl DashboardMediaRuntime {
             image_targets: Vec::new(),
             avatar_targets: Vec::new(),
             emoji_targets: Vec::new(),
+            last_placements: FramePlacements::default(),
+            current_placements: FramePlacements::default(),
+            placement_diff: PlacementDiff::default(),
+            popup_avatar_url: None,
         }
     }
 
@@ -198,6 +211,126 @@ impl DashboardMediaRuntime {
         self.avatar_targets = visible_avatar_targets_from_plan(state, layout, plan);
         self.emoji_targets = visible_emoji_image_targets(state);
     }
+
+    /// Compute everything the next frame needs *before* drawing: layout, plan,
+    /// image/avatar/emoji targets, and where each overlay image lands on screen.
+    /// The resolved placements are diffed against the previous frame so the run
+    /// loop knows whether a selective clear pass is required and which overlays
+    /// to keep in it. The plan borrows `state`, so it is rebuilt here only to
+    /// drive target computation and is not stored; the draw closures rebuild
+    /// their own plan and reuse the stored owned targets.
+    pub(super) fn prepare_frame(&mut self, state: &mut DashboardState, area: Rect) {
+        ui::sync_view_heights(area, state);
+        let preview_layout = self.preview_layout_for_draw(state, area);
+        let messages = state.visible_messages();
+        let selected = state.focused_message_selection();
+        let plan = MessageViewportPlan::new(
+            &messages,
+            selected,
+            state,
+            preview_layout.content_width,
+            preview_layout.preview_width,
+            preview_layout.max_preview_height,
+        );
+        self.compute_targets_for_draw(state, preview_layout, &plan, area);
+        self.popup_avatar_url = resolve_popup_avatar_url(state);
+
+        let current = self.resolve_placements(state, &plan, area);
+        self.placement_diff = current.diff(&self.last_placements);
+        self.current_placements = current;
+    }
+
+    /// Resolve the absolute screen geometry of every overlay image this frame.
+    /// Inline previews reuse the exact renderer path (`plan.row` +
+    /// `inline_image_preview_screen_area`), the viewer uses a coarse size-based
+    /// fingerprint (it is a single centered image), avatars use their absolute
+    /// row, and the popup avatar uses (url, circular, popup area).
+    fn resolve_placements(
+        &self,
+        state: &DashboardState,
+        plan: &MessageViewportPlan<'_>,
+        area: Rect,
+    ) -> FramePlacements {
+        let mut placements = FramePlacements::default();
+        let list = ui::image_preview_list_area(area, state);
+
+        for target in &self.image_targets {
+            if target.viewer {
+                // A single centered image. Its rect changes only on resize or
+                // zoom, both of which move width/height, so size alone is enough.
+                placements.insert_preview(
+                    target.key(),
+                    Rect::new(0, 0, target.preview_width, target.preview_height),
+                );
+                continue;
+            }
+            let Some(row_plan) = plan.row(target.message_index) else {
+                continue;
+            };
+            let row = row_plan
+                .body_top
+                .saturating_add(row_plan.metrics.body_rows() as isize)
+                .saturating_add(target.preview_y_offset_rows as isize)
+                .saturating_sub(1);
+            let Some(mut preview_area) = ui::inline_image_preview_screen_area(
+                list,
+                row,
+                target.preview_x_offset_columns,
+                target.preview_width,
+                target.preview_height,
+                target.accent_color,
+            ) else {
+                continue;
+            };
+            preview_area.height = preview_area.height.min(target.visible_preview_height);
+            placements.insert_preview(target.key(), preview_area);
+        }
+
+        for target in &self.avatar_targets {
+            placements.insert_avatar(
+                target.url().to_owned(),
+                target.row(),
+                (
+                    target.row(),
+                    target.visible_height(),
+                    target.top_clip_rows(),
+                ),
+            );
+        }
+
+        let popup_avatar = self.popup_avatar_url.as_ref().map(|url| {
+            (
+                url.clone(),
+                state.circular_avatars(),
+                ui::user_profile_popup_area(area),
+            )
+        });
+        placements.set_popup_avatar(popup_avatar);
+
+        placements
+    }
+
+    /// Promote this frame's placements to the baseline for the next diff. Called
+    /// by the run loop after both frames have been drawn.
+    pub(super) fn commit_placements(&mut self) {
+        self.last_placements = std::mem::take(&mut self.current_placements);
+    }
+
+    pub(super) fn need_clear(&self) -> bool {
+        self.placement_diff.need_clear
+    }
+}
+
+/// Resolve which avatar url the profile popup should draw, mirroring the logic
+/// in `draw_dashboard_frame`: a pending upload preview takes precedence, then
+/// the loaded popup avatar, and only when avatars are enabled at all.
+fn resolve_popup_avatar_url(state: &DashboardState) -> Option<String> {
+    let pending = state.user_profile_popup_pending_avatar_preview_key();
+    state
+        .show_avatars()
+        .then(|| pending.or_else(|| state.user_profile_popup_avatar_url()))
+        .flatten()
+        .map(str::to_owned)
 }
 
 fn clip_image_preview_targets_for_occlusions(
@@ -387,6 +520,8 @@ pub(super) fn draw_dashboard_frame(
     media_runtime: &mut DashboardMediaRuntime,
 ) -> Rect {
     let area = frame.area();
+    // The plan borrows `state`, so it cannot be carried out of `prepare_frame`;
+    // it is rebuilt here while the targets `prepare_frame` computed are reused.
     ui::sync_view_heights(area, state);
     let preview_layout = media_runtime.preview_layout_for_draw(state, area);
     let messages = state.visible_messages();
@@ -399,7 +534,6 @@ pub(super) fn draw_dashboard_frame(
         preview_layout.preview_width,
         preview_layout.max_preview_height,
     );
-    media_runtime.compute_targets_for_draw(state, preview_layout, &viewport_plan, area);
 
     let image_previews = media_runtime
         .image_previews
@@ -407,11 +541,7 @@ pub(super) fn draw_dashboard_frame(
     let rendered_emojis = media_runtime
         .emoji_images
         .render_state(&media_runtime.emoji_targets);
-    let pending_popup_avatar_key = state.user_profile_popup_pending_avatar_preview_key();
-    let popup_avatar_url = state
-        .show_avatars()
-        .then(|| pending_popup_avatar_key.or_else(|| state.user_profile_popup_avatar_url()))
-        .flatten();
+    let popup_avatar_url = media_runtime.popup_avatar_url.as_deref();
     let (rendered_avatars, popup_avatar) = media_runtime.avatar_images.render_state_with_popup(
         &media_runtime.avatar_targets,
         popup_avatar_url,
@@ -429,26 +559,82 @@ pub(super) fn draw_dashboard_frame(
     area
 }
 
-/// Draw the whole dashboard but with no images at all. Every cell an image
-/// would occupy is instead painted with its underlying content (text, blanks,
-/// or a popup drawn on top), which overwrites the leftover terminal-graphic
-/// pixels there. The run loop draws this once, immediately before the real
-/// frame, whenever images have moved or been covered/uncovered, so the next
-/// frame redraws them cleanly with no ghost (see `image_layout_signature`).
+/// Draw the whole dashboard but with only the overlay images whose placement
+/// stayed put this frame; the moved/removed ones are omitted so their old cells
+/// get overpainted with plain content, erasing the stale terminal-graphic
+/// pixels there. Unchanged overlays are kept so their cells match the previous
+/// frame and the ratatui diff emits nothing for them. All emoji are always
+/// drawn because they flow with text and the cell diff moves them naturally.
+/// The run loop draws this once, immediately before the real frame, whenever an
+/// overlay moved or was covered/uncovered, so the next frame redraws cleanly
+/// with no ghost.
 pub(super) fn clear_image_surfaces_frame(
     frame: &mut ratatui::Frame<'_>,
     state: &mut DashboardState,
+    media_runtime: &mut DashboardMediaRuntime,
 ) -> Rect {
     let area = frame.area();
     ui::sync_view_heights(area, state);
+    let preview_layout = media_runtime.preview_layout_for_draw(state, area);
+    let messages = state.visible_messages();
+    let selected = state.focused_message_selection();
+    let viewport_plan = MessageViewportPlan::new(
+        &messages,
+        selected,
+        state,
+        preview_layout.content_width,
+        preview_layout.preview_width,
+        preview_layout.max_preview_height,
+    );
+
+    // Keep only the overlays whose placement is identical to the previous frame.
+    let unchanged_previews: Vec<ImagePreviewTarget> = media_runtime
+        .image_targets
+        .iter()
+        .filter(|target| {
+            media_runtime
+                .placement_diff
+                .unchanged_previews
+                .contains(&target.key())
+        })
+        .cloned()
+        .collect();
+    let unchanged_avatars: Vec<AvatarTarget> = media_runtime
+        .avatar_targets
+        .iter()
+        .filter(|target| {
+            media_runtime
+                .placement_diff
+                .unchanged_avatars
+                .contains(&(target.url().to_owned(), target.row()))
+        })
+        .cloned()
+        .collect();
+
+    let image_previews = media_runtime.image_previews.render_state(&unchanged_previews);
+    let rendered_emojis = media_runtime
+        .emoji_images
+        .render_state(&media_runtime.emoji_targets);
+    // Only keep the popup avatar when it did not move; otherwise omit it so its
+    // old cells are overpainted.
+    let popup_avatar_url = if media_runtime.placement_diff.popup_avatar_unchanged {
+        media_runtime.popup_avatar_url.as_deref()
+    } else {
+        None
+    };
+    let (rendered_avatars, popup_avatar) = media_runtime.avatar_images.render_state_with_popup(
+        &unchanged_avatars,
+        popup_avatar_url,
+        state.circular_avatars(),
+    );
     ui::render_with_message_viewport_plan(
         frame,
         state,
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        None,
-        None,
+        image_previews,
+        rendered_avatars,
+        rendered_emojis,
+        popup_avatar,
+        Some(&viewport_plan),
     );
     area
 }
