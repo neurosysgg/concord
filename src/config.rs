@@ -412,16 +412,28 @@ impl DisplayOptions {
 }
 
 pub fn load_options() -> Result<AppOptions> {
+    Ok(load_options_with_warnings()?.0)
+}
+
+pub fn load_options_with_warnings() -> Result<(AppOptions, Vec<String>)> {
     let path = config_path()?;
     load_options_from_path(&path)
 }
 
 pub fn load_keymap_options() -> Result<KeymapOptions> {
+    Ok(load_keymap_options_with_warnings()?.0)
+}
+
+pub fn load_keymap_options_with_warnings() -> Result<(KeymapOptions, Vec<String>)> {
     let path = keymap_path()?;
     load_keymap_options_from_path(&path)
 }
 
 pub fn load_ui_state_options() -> Result<UiStateOptions> {
+    Ok(load_ui_state_options_with_warnings()?.0)
+}
+
+pub fn load_ui_state_options_with_warnings() -> Result<(UiStateOptions, Vec<String>)> {
     let path = state_path()?;
     load_ui_state_options_from_path(&path)
 }
@@ -436,28 +448,175 @@ pub fn config_path_display() -> String {
         .unwrap_or_else(|| "~/.config/concord/config.toml".to_owned())
 }
 
-fn load_options_from_path(path: &Path) -> Result<AppOptions> {
+fn load_options_from_path(path: &Path) -> Result<(AppOptions, Vec<String>)> {
     match fs::read_to_string(path) {
-        Ok(content) => Ok(toml::from_str::<AppOptions>(&content)?),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(AppOptions::default()),
+        Ok(content) => Ok(parse_app_options(&content)?),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok((AppOptions::default(), Vec::new()))
+        }
         Err(error) => Err(error.into()),
     }
 }
 
-fn load_keymap_options_from_path(path: &Path) -> Result<KeymapOptions> {
+/// Parse `config.toml` tolerantly: a value with a wrong type or unknown variant
+/// is skipped (its field falls back to default) instead of discarding the whole
+/// file. Only real syntax errors fail.
+fn parse_app_options(content: &str) -> Result<(AppOptions, Vec<String>)> {
+    let root: toml::Table = toml::from_str(content)?;
+    let mut warnings = Vec::new();
+
+    let options = AppOptions {
+        display: section(&root, "display", &mut warnings),
+        composer: section(&root, "composer", &mut warnings),
+        credentials: section(&root, "credentials", &mut warnings),
+        notifications: section(&root, "notifications", &mut warnings),
+        voice: section(&root, "voice", &mut warnings),
+    };
+
+    Ok((options, warnings))
+}
+
+/// A TOML table holding a single `key = value`, used to probe one field at a
+/// time.
+fn one_entry(key: &str, value: toml::Value) -> toml::Table {
+    let mut table = toml::Table::new();
+    table.insert(key.to_owned(), value);
+    table
+}
+
+fn section<T>(root: &toml::Table, name: &str, warnings: &mut Vec<String>) -> T
+where
+    T: serde::de::DeserializeOwned + Default,
+{
+    let Some(value) = root.get(name) else {
+        return T::default();
+    };
+    let Some(table) = value.as_table() else {
+        warnings.push(format!("[{name}] must be a table, using defaults"));
+        return T::default();
+    };
+
+    let mut clean = toml::Table::new();
+    for (key, value) in table {
+        // A one-key probe deserializes exactly when that value is valid, because
+        // `T` derives `#[serde(default)]` and fills in the omitted fields.
+        let probed: std::result::Result<T, _> =
+            toml::Value::Table(one_entry(key, value.clone())).try_into();
+        match probed {
+            Ok(_) => {
+                clean.insert(key.clone(), value.clone());
+            }
+            Err(error) => {
+                warnings.push(format!("[{name}] {key} is invalid and was ignored: {error}"));
+            }
+        }
+    }
+
+    match toml::Value::Table(clean).try_into() {
+        Ok(options) => options,
+        Err(error) => {
+            warnings.push(format!("[{name}] could not be applied, using defaults: {error}"));
+            T::default()
+        }
+    }
+}
+
+fn load_keymap_options_from_path(path: &Path) -> Result<(KeymapOptions, Vec<String>)> {
     match fs::read_to_string(path) {
-        Ok(content) => Ok(toml::from_str::<KeymapFileOptions>(&content)?.keymap),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(KeymapOptions::default()),
+        Ok(content) => Ok(parse_keymap_options(&content)?),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok((KeymapOptions::default(), Vec::new()))
+        }
         Err(error) => Err(error.into()),
     }
 }
 
-fn load_ui_state_options_from_path(path: &Path) -> Result<UiStateOptions> {
+fn load_ui_state_options_from_path(path: &Path) -> Result<(UiStateOptions, Vec<String>)> {
     match fs::read_to_string(path) {
-        Ok(content) => Ok(toml::from_str::<UiStateFileOptions>(&content)?.ui_state),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(UiStateOptions::default()),
+        Ok(content) => Ok(parse_ui_state_options(&content)?),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok((UiStateOptions::default(), Vec::new()))
+        }
         Err(error) => Err(error.into()),
     }
+}
+
+fn parse_ui_state_options(content: &str) -> Result<(UiStateOptions, Vec<String>)> {
+    let root: toml::Table = toml::from_str(content)?;
+    let mut warnings = Vec::new();
+    let ui_state = section(&root, "ui_state", &mut warnings);
+    Ok((ui_state, warnings))
+}
+
+/// Named map fields of `KeymapOptions`. Any other `[keymap]` key flattens into
+/// `mappings` and is validated as a top-level binding instead. A test keeps this
+/// in sync with the struct's named `BTreeMap` fields.
+const KEYMAP_ACTION_MAPS: [&str; 7] = [
+    "groups",
+    "guild_actions",
+    "channel_actions",
+    "message_actions",
+    "member_actions",
+    "thread_actions",
+    "composer",
+];
+
+/// Whether a `[keymap]` probe table deserializes, i.e. the binding it holds is
+/// valid.
+fn keymap_accepts(keymap: toml::Table) -> bool {
+    toml::Value::Table(keymap)
+        .try_into::<KeymapOptions>()
+        .is_ok()
+}
+
+/// Parse `keymap.toml` tolerantly, one keybinding at a time: a bad binding (at
+/// the top level or inside an action map like `[keymap.guild_actions]`) is
+/// dropped on its own. Only real syntax errors fail.
+fn parse_keymap_options(content: &str) -> Result<(KeymapOptions, Vec<String>)> {
+    let root: toml::Table = toml::from_str(content)?;
+    let mut warnings = Vec::new();
+
+    let Some(keymap) = root.get("keymap") else {
+        return Ok((KeymapOptions::default(), Vec::new()));
+    };
+    let Some(table) = keymap.as_table() else {
+        warnings.push("[keymap] must be a table, using defaults".to_owned());
+        return Ok((KeymapOptions::default(), warnings));
+    };
+
+    let mut clean = toml::Table::new();
+    for (key, value) in table {
+        if KEYMAP_ACTION_MAPS.contains(&key.as_str()) {
+            let Some(bindings) = value.as_table() else {
+                warnings.push(format!("[keymap.{key}] must be a table, using defaults"));
+                continue;
+            };
+            let mut clean_bindings = toml::Table::new();
+            for (name, binding) in bindings {
+                let probe = one_entry(key, toml::Value::Table(one_entry(name, binding.clone())));
+                if keymap_accepts(probe) {
+                    clean_bindings.insert(name.clone(), binding.clone());
+                } else {
+                    warnings.push(format!("[keymap.{key}] {name} is invalid and was ignored"));
+                }
+            }
+            clean.insert(key.clone(), toml::Value::Table(clean_bindings));
+        } else if keymap_accepts(one_entry(key, value.clone())) {
+            clean.insert(key.clone(), value.clone());
+        } else {
+            warnings.push(format!("[keymap] {key} is invalid and was ignored"));
+        }
+    }
+
+    let file = one_entry("keymap", toml::Value::Table(clean));
+    let keymap = match toml::Value::Table(file).try_into::<KeymapFileOptions>() {
+        Ok(file) => file.keymap,
+        Err(error) => {
+            warnings.push(format!("[keymap] could not be applied, using defaults: {error}"));
+            KeymapOptions::default()
+        }
+    };
+    Ok((keymap, warnings))
 }
 
 pub fn save_options(options: &AppOptions) -> Result<()> {
@@ -530,9 +689,10 @@ mod tests {
 
     use super::{
         AppOptions, ComposerOptions, CredentialOptions, CredentialStoreMode, DisplayOptions,
-        ImagePreviewQualityPreset, ImageProtocolPreference, KeymapFileOptions, KeymapOptions,
-        MicrophoneSensitivityDb, NotificationOptions, VoiceOptions, VoiceVolumePercent,
-        load_keymap_options_from_path, load_options_from_path, save_options_to_path,
+        ImagePreviewQualityPreset, ImageProtocolPreference, KeymapBinding, KeymapFileOptions,
+        KeymapOptions, MicrophoneSensitivityDb, NotificationOptions, VoiceOptions, VoiceVolumePercent,
+        load_keymap_options_from_path, load_options_from_path, parse_app_options,
+        save_options_to_path,
     };
 
     #[test]
@@ -772,6 +932,42 @@ mod tests {
     }
 
     #[test]
+    fn invalid_value_is_skipped_without_discarding_the_rest() {
+        let (options, warnings) = parse_app_options(
+            "[display]\nshow_avatars = false\nimage_protocol = \"bogus\"\nshow_images = \"yes\"\n\n[voice]\nself_mute = true\n",
+        )
+        .expect("syntactically valid config should parse");
+
+        assert!(!options.display.show_avatars, "valid sibling value applies");
+        assert!(options.voice.self_mute, "valid value in other section applies");
+        assert_eq!(
+            options.display.image_protocol,
+            ImageProtocolPreference::default(),
+            "invalid value falls back to default"
+        );
+        assert!(
+            options.display.show_images,
+            "wrong-typed value falls back to default"
+        );
+        assert_eq!(warnings.len(), 2, "one warning per skipped value");
+        assert!(warnings.iter().any(|w| w.contains("image_protocol")));
+        assert!(warnings.iter().any(|w| w.contains("show_images")));
+    }
+
+    #[test]
+    fn valid_config_reports_no_warnings() {
+        let (_, warnings) = parse_app_options("[display]\nshow_avatars = false\n")
+            .expect("valid config should parse");
+
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn syntax_error_still_fails() {
+        assert!(parse_app_options("[display]\nshow_avatars = ").is_err());
+    }
+
+    #[test]
     fn config_options_ignore_keymap_sections() {
         let config: AppOptions = toml::from_str(
             "[keymap]\nStartComposer = { keys = [\"c\"] }\n\n[display]\nshow_avatars = false\n",
@@ -896,6 +1092,89 @@ mod tests {
     }
 
     #[test]
+    fn keymap_invalid_binding_is_skipped_without_discarding_the_rest() {
+        let (keymap, warnings) = super::parse_keymap_options(
+            "[keymap]\nleader = \"space\"\nStartComposer = \"<leader>e\"\nReplyMessage = 123\n\n[keymap.guild_actions]\nMuteServer = \"m\"\nBadAction = 7\n",
+        )
+        .expect("syntactically valid keymap should parse");
+
+        assert_eq!(keymap.leader.as_deref(), Some("space"));
+        assert_eq!(
+            keymap.mappings.get("StartComposer"),
+            Some(&crate::config::KeymapBinding::one("<leader>e")),
+            "valid top-level binding applies"
+        );
+        assert!(
+            !keymap.mappings.contains_key("ReplyMessage"),
+            "invalid top-level binding is skipped"
+        );
+        assert_eq!(
+            keymap.guild_actions.get("MuteServer"),
+            Some(&crate::config::KeymapBinding::one("m")),
+            "valid action binding survives a bad sibling"
+        );
+        assert!(
+            !keymap.guild_actions.contains_key("BadAction"),
+            "invalid action binding is skipped"
+        );
+        assert_eq!(warnings.len(), 2);
+        assert!(warnings.iter().any(|w| w.contains("ReplyMessage")));
+        assert!(warnings.iter().any(|w| w.contains("BadAction")));
+    }
+
+    #[test]
+    fn keymap_action_maps_list_stays_in_sync_with_struct() {
+        use std::collections::{BTreeMap, BTreeSet};
+
+        // Built field by field on purpose: adding a named map to KeymapOptions
+        // fails to compile here, a reminder to also list it in
+        // KEYMAP_ACTION_MAPS so its bindings keep field-level tolerance.
+        let action = || BTreeMap::from([("Probe".to_owned(), KeymapBinding::one("a"))]);
+        let keymap = KeymapOptions {
+            leader: Some("space".to_owned()),
+            groups: BTreeMap::from([("Probe".to_owned(), "value".to_owned())]),
+            guild_actions: action(),
+            channel_actions: action(),
+            message_actions: action(),
+            member_actions: action(),
+            thread_actions: action(),
+            composer: action(),
+            mappings: BTreeMap::new(),
+        };
+
+        // Named maps serialize as TOML tables; leader is a scalar. The set of
+        // table-valued keys must equal the hand-maintained list.
+        let serialized = toml::Value::try_from(&keymap).expect("keymap serializes");
+        let named_maps: BTreeSet<&str> = serialized
+            .as_table()
+            .expect("keymap is a table")
+            .iter()
+            .filter(|(_, value)| value.is_table())
+            .map(|(key, _)| key.as_str())
+            .collect();
+
+        let listed: BTreeSet<&str> = super::KEYMAP_ACTION_MAPS.iter().copied().collect();
+        assert_eq!(named_maps, listed);
+    }
+
+    #[test]
+    fn ui_state_invalid_value_is_skipped_without_discarding_the_rest() {
+        let (ui_state, warnings) = super::parse_ui_state_options(
+            "[ui_state]\nguild_pane_visible = false\nserver_width = \"wide\"\n",
+        )
+        .expect("syntactically valid ui_state should parse");
+
+        assert!(!ui_state.guild_pane_visible, "valid value applies");
+        assert_eq!(
+            ui_state.server_width,
+            super::DEFAULT_SERVER_WIDTH,
+            "invalid value falls back to default"
+        );
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("server_width"));
+    }
+
+    #[test]
     fn voice_volume_config_values_are_clamped() {
         let config: AppOptions =
             toml::from_str("[voice]\nmicrophone_volume = 150\nvoice_output_volume = -10\n")
@@ -945,7 +1224,8 @@ mod tests {
         let saved = fs::read_to_string(&path).expect("config should be readable");
         assert!(!saved.contains("[keymap"));
         assert!(!saved.contains("[ui_state"));
-        let loaded = load_options_from_path(&path).expect("config should load");
+        let (loaded, warnings) = load_options_from_path(&path).expect("config should load");
+        assert!(warnings.is_empty());
 
         assert_eq!(loaded.display, options.display);
         assert_eq!(loaded.composer, options.composer);
@@ -961,9 +1241,11 @@ mod tests {
     fn keymap_options_load_from_path_defaults_when_missing() {
         let path = test_keymap_path();
 
-        let loaded = load_keymap_options_from_path(&path).expect("missing keymap should load");
+        let (loaded, warnings) =
+            load_keymap_options_from_path(&path).expect("missing keymap should load");
 
         assert_eq!(loaded, KeymapOptions::default());
+        assert!(warnings.is_empty());
     }
 
     #[test]
@@ -975,7 +1257,7 @@ mod tests {
         fs::write(&path, "[keymap]\nStartComposer = { keys = [\"c\"] }\n")
             .expect("test keymap should be written");
 
-        let loaded = load_keymap_options_from_path(&path).expect("keymap should load");
+        let (loaded, _) = load_keymap_options_from_path(&path).expect("keymap should load");
 
         assert_eq!(
             loaded.mappings.get("StartComposer"),

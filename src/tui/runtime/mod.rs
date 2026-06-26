@@ -55,22 +55,32 @@ pub(super) async fn run_dashboard(
     commands: mpsc::Sender<AppCommand>,
     client: DiscordClient,
 ) -> Result<DashboardExit> {
-    let options = match config::load_options() {
-        Ok(options) => options,
+    let mut config_warnings = Vec::new();
+    let options = match config::load_options_with_warnings() {
+        Ok((options, warnings)) => {
+            config_warnings.extend(warnings);
+            options
+        }
         Err(error) => {
             logging::error("config", format!("failed to load config: {error}"));
             config::AppOptions::default()
         }
     };
-    let ui_state_options = match config::load_ui_state_options() {
-        Ok(options) => options,
+    let ui_state_options = match config::load_ui_state_options_with_warnings() {
+        Ok((options, warnings)) => {
+            config_warnings.extend(warnings);
+            options
+        }
         Err(error) => {
             logging::error("config", format!("failed to load UI state: {error}"));
             config::UiStateOptions::default()
         }
     };
-    let keymap_options = match config::load_keymap_options() {
-        Ok(options) => options,
+    let keymap_options = match config::load_keymap_options_with_warnings() {
+        Ok((options, warnings)) => {
+            config_warnings.extend(warnings);
+            options
+        }
         Err(error) => {
             logging::error("config", format!("failed to load keymap config: {error}"));
             config::KeymapOptions::default()
@@ -90,6 +100,21 @@ pub(super) async fn run_dashboard(
     let mut current_snapshot_revision = initial_snapshot.revision.global;
     let mut current_snapshot_area_revision = initial_snapshot.revision;
     state.restore_discord_snapshot(initial_snapshot.to_state());
+    // Invalid config values were skipped, not fatal: log each and toast a count.
+    if !config_warnings.is_empty() {
+        for warning in &config_warnings {
+            logging::error("config", warning.clone());
+        }
+        let summary = if config_warnings.len() == 1 {
+            "Config: 1 invalid value was ignored (see log)".to_owned()
+        } else {
+            format!(
+                "Config: {} invalid values were ignored (see log)",
+                config_warnings.len()
+            )
+        };
+        state.show_error_toast(summary, std::time::Instant::now());
+    }
     let mut media_runtime = DashboardMediaRuntime::new(options.display.image_protocol);
     let mut terminal_events = EventStream::new();
     let mut mouse_clicks = input::MouseClickTracker::default();
