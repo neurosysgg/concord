@@ -6,6 +6,7 @@ use crate::{
         MessageInteractionInfo, MessageKind, MessageReferenceInfo, MessageSnapshotInfo,
         MessageUpdateDispatchInfo, PollAnswerInfo, PollInfo, ReactionEmoji, ReactionInfo,
         ReplyInfo,
+        avatar::user_avatar_url,
         events::AppEvent,
         ids::{
             Id,
@@ -20,7 +21,6 @@ use crate::{
 
 use super::shared::{
     display_name_from_parts, display_name_from_parts_or_unknown, extra_fields, parse_id,
-    raw_user_avatar_url,
 };
 
 pub(crate) fn parse_message_info(data: &Value) -> Option<MessageInfo> {
@@ -29,7 +29,7 @@ pub(crate) fn parse_message_info(data: &Value) -> Option<MessageInfo> {
     let author = data.get("author")?;
     let author_id = parse_id::<UserMarker>(author.get("id")?)?;
     let author_name = message_author_display_name(data, author);
-    let author_avatar_url = raw_user_avatar_url(author_id, author);
+    let author_avatar_url = user_avatar_url(author_id, author);
     let author_is_bot = author.get("bot").and_then(Value::as_bool).unwrap_or(false);
     let author_role_ids = parse_message_author_role_ids(data);
     let guild_id = data.get("guild_id").and_then(parse_id::<GuildMarker>);

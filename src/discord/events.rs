@@ -1697,20 +1697,6 @@ fn poll_result_info_from_fields<'a>(
     })
 }
 
-pub(crate) fn default_avatar_url(user_id: Id<UserMarker>, discriminator: u16) -> String {
-    let index = if discriminator == 0 {
-        (user_id.get() >> 22) % 6
-    } else {
-        u64::from(discriminator % 5)
-    };
-
-    format!("https://cdn.discordapp.com/embed/avatars/{index}.png")
-}
-
-pub(crate) fn avatar_hash_extension(hash: &str) -> &'static str {
-    if hash.starts_with("a_") { "gif" } else { "png" }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::discord::AttachmentInfo;

@@ -1,5 +1,6 @@
 mod application_commands;
 mod auth_http;
+mod avatar;
 mod builtin_commands;
 mod capabilities;
 mod captcha;

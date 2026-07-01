@@ -2,6 +2,7 @@ use serde_json::Value;
 
 use crate::discord::{
     GuildMemberListUpdateInfo, GuildMembersChunkInfo, MemberInfo,
+    avatar::{member_avatar_url, user_avatar_url},
     events::{AppEvent, PresenceEventFields},
     ids::{
         Id,
@@ -11,10 +12,7 @@ use crate::discord::{
 
 use super::{
     presence::{parse_activities, parse_presence_entry},
-    shared::{
-        display_name_from_parts_or_unknown, extra_fields, parse_id, parse_status,
-        raw_member_avatar_url, raw_user_avatar_url,
-    },
+    shared::{display_name_from_parts_or_unknown, extra_fields, parse_id, parse_status},
 };
 
 pub(super) fn parse_member_upsert(data: &Value) -> Option<AppEvent> {
@@ -40,7 +38,7 @@ pub(super) fn parse_user_update(data: &Value) -> Option<AppEvent> {
         user_id,
         username,
         global_name,
-        avatar_url: raw_user_avatar_url(user_id, data),
+        avatar_url: user_avatar_url(user_id, data),
         is_bot: data.get("bot").and_then(Value::as_bool).unwrap_or(false),
     })
 }
@@ -249,7 +247,7 @@ pub(super) fn parse_member_info(
         display_name,
         username: username.map(str::to_owned),
         is_bot,
-        avatar_url: raw_member_avatar_url(guild_id, user_id, value, user),
+        avatar_url: member_avatar_url(guild_id, user_id, Some(value), user),
         role_ids: value
             .get("roles")
             .and_then(Value::as_array)

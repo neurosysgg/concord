@@ -4,6 +4,7 @@ use crate::discord::{
     ChannelInfo, ChannelRecipientInfo, ForumTagInfo, PermissionOverwriteInfo,
     PermissionOverwriteKind, ThreadListSyncInfo, ThreadMemberUpdateInfo, ThreadMembersUpdateInfo,
     ThreadMetadataInfo,
+    avatar::user_avatar_url,
     events::AppEvent,
     ids::{
         Id,
@@ -15,7 +16,7 @@ use crate::discord::{
 
 use super::shared::{
     display_name_from_parts, display_name_from_parts_or_unknown, extra_fields, parse_id,
-    parse_status, raw_user_avatar_url,
+    parse_status,
 };
 
 pub(crate) fn parse_channel_info(
@@ -247,7 +248,7 @@ pub(super) fn parse_channel_recipient_info(value: &Value) -> Option<ChannelRecip
         display_name,
         username: username.map(str::to_owned),
         is_bot,
-        avatar_url: raw_user_avatar_url(user_id, value),
+        avatar_url: user_avatar_url(user_id, value),
         status,
     })
 }

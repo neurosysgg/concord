@@ -767,6 +767,7 @@ fn mute_request_body_includes_selected_time_window() {
 fn user_profile_parser_keeps_guild_member_roles() {
     let profile = parse_user_profile_response(
         Id::new(10),
+        None,
         &serde_json::json!({
             "user": { "id": "10", "username": "test-user" },
             "guild_member": { "roles": ["90", "91"] }
@@ -775,6 +776,49 @@ fn user_profile_parser_keeps_guild_member_roles() {
     );
 
     assert_eq!(profile.role_ids, vec![Id::new(90), Id::new(91)]);
+}
+
+#[test]
+fn user_profile_parser_resolves_avatar_url() {
+    let with_avatar = parse_user_profile_response(
+        Id::new(10),
+        None,
+        &serde_json::json!({
+            "user": { "id": "10", "username": "test-user", "avatar": "abc123" }
+        }),
+        None,
+    );
+    assert_eq!(
+        with_avatar.avatar_url.as_deref(),
+        Some("https://cdn.discordapp.com/avatars/10/abc123.png")
+    );
+
+    let default_profile = parse_user_profile_response(
+        Id::new(10),
+        None,
+        &serde_json::json!({
+            "user": { "id": "10", "username": "test-user", "discriminator": "0" }
+        }),
+        None,
+    );
+    assert_eq!(
+        default_profile.avatar_url.as_deref(),
+        Some("https://cdn.discordapp.com/embed/avatars/0.png")
+    );
+
+    let guild_avatar = parse_user_profile_response(
+        Id::new(10),
+        Some(Id::new(77)),
+        &serde_json::json!({
+            "user": { "id": "10", "username": "test-user", "avatar": "abc123" },
+            "guild_member": { "avatar": "def456" }
+        }),
+        None,
+    );
+    assert_eq!(
+        guild_avatar.avatar_url.as_deref(),
+        Some("https://cdn.discordapp.com/guilds/77/users/10/avatars/def456.png")
+    );
 }
 
 fn forum_thread(parent_id: Id<ChannelMarker>, thread_id: u64, name: &str) -> ChannelInfo {

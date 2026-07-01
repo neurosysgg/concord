@@ -10,8 +10,7 @@ use crate::{
     AppError, Result,
     discord::{
         FriendStatus, GlobalUserProfileUpdate, GuildUserProfileUpdate, MutualGuildInfo,
-        UserProfileInfo, UserProfileUpdate, events::avatar_hash_extension,
-        read_profile_avatar_image,
+        UserProfileInfo, UserProfileUpdate, avatar::member_avatar_url, read_profile_avatar_image,
     },
 };
 
@@ -38,7 +37,7 @@ impl DiscordRest {
             .send_json(self.raw_http.get(url), "user profile")
             .await?;
 
-        Ok(parse_user_profile_response(user_id, &body, None))
+        Ok(parse_user_profile_response(user_id, guild_id, &body, None))
     }
 
     /// Returns the user's saved note, or `None` if Discord responds 404
@@ -165,10 +164,11 @@ async fn profile_avatar_data_uri(avatar: &crate::discord::ProfileAvatarUpload) -
 /// caller fills it in from cached relationship data.
 pub(super) fn parse_user_profile_response(
     user_id: Id<UserMarker>,
+    guild_id: Option<Id<GuildMarker>>,
     body: &Value,
     note: Option<String>,
 ) -> UserProfileInfo {
-    UserProfileResponse::parse(user_id, body, note).profile
+    UserProfileResponse::parse(user_id, guild_id, body, note).profile
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -200,7 +200,12 @@ impl UserNoteResponse {
 }
 
 impl UserProfileResponse {
-    pub(super) fn parse(user_id: Id<UserMarker>, body: &Value, note: Option<String>) -> Self {
+    pub(super) fn parse(
+        user_id: Id<UserMarker>,
+        guild_id: Option<Id<GuildMarker>>,
+        body: &Value,
+        note: Option<String>,
+    ) -> Self {
         let user = body.get("user");
         let username = user
             .and_then(|user| user.get("username"))
@@ -212,7 +217,7 @@ impl UserProfileResponse {
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
             .map(str::to_owned);
-        let avatar_url = user.and_then(profile_avatar_url);
+        let avatar_url = member_avatar_url(guild_id, user_id, body.get("guild_member"), user);
         let user_profile = body.get("user_profile");
         let bio = user_profile
             .and_then(|profile| profile.get("bio"))
@@ -312,19 +317,4 @@ fn parse_profile_role_id(value: &Value) -> Option<Id<RoleMarker>> {
         .and_then(|raw| raw.parse::<u64>().ok())
         .or_else(|| value.as_u64())
         .and_then(Id::new_checked)
-}
-
-fn profile_avatar_url(user: &Value) -> Option<String> {
-    let user_id = user
-        .get("id")
-        .and_then(Value::as_str)
-        .and_then(|raw| raw.parse::<u64>().ok())?;
-    let hash = user
-        .get("avatar")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())?;
-    let extension = avatar_hash_extension(hash);
-    Some(format!(
-        "https://cdn.discordapp.com/avatars/{user_id}/{hash}.{extension}"
-    ))
 }
