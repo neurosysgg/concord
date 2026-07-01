@@ -414,6 +414,7 @@ overlay.
 | `Ctrl+Left`/ `Ctrl+Right`                    | Jump word         | Jump the cursor by word                                          |
 | `Alt+Backspace`, `Ctrl+Backspace` / `Ctrl+w` | Delete word       | Delete the word before the cursor                                |
 | `Delete`                                     | Detach attachment | Removes the last pending attachment                              |
+| `Alt+p`                                      | Toggle reply ping | Toggle whether replying pings the original author                |
 
 #### Mention picker
 
