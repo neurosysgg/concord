@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.12] - 2026-07-03
+
+### Features
+
+- _(presence)_ Relay Rich Presence from local apps (#239) in [#239](https://github.com/chojs23/concord/pull/239) by @chojs23
+
+### Refactor
+
+- _(tui)_ Unify custom-emoji image overlays into single module by @chojs23
+
 ## [2.2.11] - 2026-07-01
 
 ### Bug Fixes
