@@ -84,7 +84,19 @@ cargo install --locked --git https://github.com/chojs23/concord
 
 ### Nix
 
-Run without installing (requires flakes enabled):
+Install the packaged release from nixpkgs:
+
+```sh
+nix profile install nixpkgs#concord-tui
+```
+
+Run the packaged release without installing:
+
+```sh
+nix run nixpkgs#concord-tui
+```
+
+Run the latest release without installing (requires flakes enabled):
 
 ```sh
 nix run github:chojs23/concord
