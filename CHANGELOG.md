@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.2.12] - 2026-07-03
+## [2.2.13] - 2026-07-04
+
+### Features
+
+- Add support for playing audio attachments (#240) in [#240](https://github.com/chojs23/concord/pull/240) by @LmanTW
+
+### Refactor
+
+- _(tui)_ Standardize popup action buttons by @chojs23
+
+### Nix
+
+- Move package derivation to nix/package.nix by @chojs23
+
+## [2.2.12] - 2026-07-02
 
 ### Features
 
