@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.1] - 2026-07-07
+
+### Features
+
+- Add delete line composer key (#246) in [#246](https://github.com/chojs23/concord/pull/246) by @chojs23
+- Support CONCORD_TOKEN env var in Auto credential mode (#243) in [#243](https://github.com/chojs23/concord/pull/243) by @yilisharcs
+- Collapse avatar gutter and move selected-message time to border (#247) in [#247](https://github.com/chojs23/concord/pull/247) by @chojs23
+
+### Refactor
+
+- Generalize composer input actions by @chojs23
+
+### New Contributors
+
+- @yilisharcs made their first contribution in [#243](https://github.com/chojs23/concord/pull/243)
+
 ## [2.3.0] - 2026-07-06
 
 ### Bug Fixes
