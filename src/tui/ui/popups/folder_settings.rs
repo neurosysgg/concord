@@ -17,7 +17,6 @@ pub(in crate::tui::ui) fn render_folder_settings_popup(
     let editing = state.is_folder_settings_editing();
     let color_error = state.folder_settings_color_error();
     let popup = folder_settings_popup_area(area);
-    frame.render_widget(Clear, popup);
     let inner_width = popup.width.saturating_sub(2) as usize;
     let lines = truncate_popup_lines(
         vec![

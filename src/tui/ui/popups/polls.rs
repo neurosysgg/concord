@@ -18,7 +18,6 @@ pub(in crate::tui::ui) fn render_poll_vote_picker(
 
     let selected = state.selected_poll_vote_picker_index().unwrap_or(0);
     let popup = poll_vote_picker_popup_area(area, answers.len());
-    frame.render_widget(Clear, popup);
     render_modal_paragraph(
         frame,
         popup,

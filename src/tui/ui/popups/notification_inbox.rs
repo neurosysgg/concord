@@ -19,16 +19,15 @@ pub(in crate::tui::ui) fn render_notification_inbox_popup(
     let inner_width = usize::from(popup.width.saturating_sub(2)).max(1);
     let body_lines = usize::from(popup.height.saturating_sub(6)).max(1);
 
-    frame.render_widget(Clear, popup);
+    let inner = render_modal_frame(frame, popup, "Inbox");
     frame.render_widget(
         Paragraph::new(notification_inbox_lines(
             state,
             tab,
             body_lines,
             inner_width,
-        ))
-        .block(panel_block("Inbox", true)),
-        popup,
+        )),
+        inner,
     );
 }
 

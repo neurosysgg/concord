@@ -17,7 +17,6 @@ pub(in crate::tui::ui) fn render_search_popup(
     };
     let popup = search_popup_area(area, &view);
     let max_result_lines = search_popup_result_capacity(popup, &view);
-    frame.render_widget(Clear, popup);
     render_modal_paragraph(
         frame,
         popup,

@@ -20,10 +20,7 @@ pub(in crate::tui::ui) fn render_attachment_viewer(
     let popup = attachment_viewer_popup(frame_area, zoom);
     let title_width = usize::from(popup.width.saturating_sub(4)).max(1);
     let title = truncate_display_width(&attachment_viewer_title(&item), title_width);
-    frame.render_widget(Clear, popup);
-    let block = panel_block_owned(title, true);
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner = render_modal_frame(frame, popup, title);
     let hint_height = inner.height.min(1);
     let body_area = Rect {
         height: inner.height.saturating_sub(hint_height),

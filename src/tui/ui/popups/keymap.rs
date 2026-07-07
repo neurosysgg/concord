@@ -22,11 +22,7 @@ fn render_keymap_popup(
     state: &DashboardState,
 ) {
     let popup = keymap_popup_area(area);
-
-    frame.render_widget(Clear, popup);
-    let block = panel_block(title, true);
-    let inner = keymap_popup_text_area(area);
-    frame.render_widget(block, popup);
+    let inner = render_modal_frame(frame, popup, title);
 
     let total_lines = lines.len();
     let viewport = usize::from(inner.height);

@@ -44,9 +44,7 @@ pub(in crate::tui::ui) fn render_forum_post_composer(
     let previews = state.forum_post_attachment_previews();
 
     let popup = forum_post_composer_popup_area(area);
-    frame.render_widget(Clear, popup);
-    let block = panel_block("Create Forum Post", true);
-    let inner = block.inner(popup);
+    let inner = render_modal_frame(frame, popup, "Create Forum Post");
     // Reserve the rightmost column for the scrollbar so long content never
     // collides with it.
     let content_width = usize::from(inner.width.saturating_sub(1)).max(1);
@@ -67,7 +65,7 @@ pub(in crate::tui::ui) fn render_forum_post_composer(
         .take(viewport)
         .cloned()
         .collect();
-    frame.render_widget(Paragraph::new(visible).block(block), popup);
+    frame.render_widget(Paragraph::new(visible), inner);
     render_vertical_scrollbar(frame, inner, scroll, viewport, total);
 
     // Paint preview tiles over the reserved blank rows, offset by the scroll.
@@ -394,15 +392,13 @@ pub(in crate::tui::ui) fn render_forum_post_tag_picker(
     }
     let tags = &view.tags;
     let popup = forum_post_tag_picker_popup_area(area, tags.len());
-    let block = panel_block("Choose tags", true);
-    let content = block.inner(popup);
+    let content = render_modal_frame(frame, popup, "Choose tags");
     let visible_items = usize::from(content.height)
         .min(TAG_PICKER_VISIBLE_ITEMS)
         .min(tags.len())
         .max(1);
     let visible_range = selection::visible_window(view.tag_scroll, visible_items, tags.len());
     let ready_urls = super::thread_edit::ready_emoji_urls(emoji_images);
-    frame.render_widget(Clear, popup);
     let rows: Vec<Line<'static>> = tags[visible_range.clone()]
         .iter()
         .map(|tag| {
@@ -416,10 +412,7 @@ pub(in crate::tui::ui) fn render_forum_post_tag_picker(
             )
         })
         .collect();
-    frame.render_widget(
-        Paragraph::new(rows).block(block).wrap(Wrap { trim: false }),
-        popup,
-    );
+    frame.render_widget(Paragraph::new(rows).wrap(Wrap { trim: false }), content);
     if state.show_custom_emoji() {
         super::thread_edit::render_tag_picker_emojis(
             frame,

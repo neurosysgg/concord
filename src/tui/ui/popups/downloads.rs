@@ -21,11 +21,8 @@ pub(in crate::tui::ui) fn render_downloads_popup(
 
     let lines = downloads_popup_lines(&downloads, popup.width.saturating_sub(2));
 
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines).block(panel_block("Downloads", true)),
-        popup,
-    );
+    let inner = render_modal_frame(frame, popup, "Downloads");
+    frame.render_widget(Paragraph::new(lines), inner);
 }
 
 pub(in crate::tui::ui) fn downloads_popup_line_count(download_count: usize) -> usize {

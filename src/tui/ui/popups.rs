@@ -201,18 +201,25 @@ fn active_modal_popup_area(frame_area: Rect, state: &DashboardState) -> Option<R
     }
 }
 
+/// Clears the popup area, draws the standard focused panel border, and
+/// returns the inner content rect. Every modal popup opens with this
+/// sequence; content is then rendered into the returned rect.
+fn render_modal_frame(frame: &mut Frame, popup: Rect, title: impl Into<String>) -> Rect {
+    frame.render_widget(Clear, popup);
+    let block = panel_block_owned(title.into(), true);
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    inner
+}
+
 fn render_modal_paragraph(
     frame: &mut Frame,
     popup: Rect,
-    title: &'static str,
+    title: impl Into<String>,
     lines: Vec<Line<'static>>,
 ) {
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(panel_block(title, true))
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
+    let inner = render_modal_frame(frame, popup, title);
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 }
 
 fn popup_shortcut_help_text(items: &[(&str, &str)]) -> String {

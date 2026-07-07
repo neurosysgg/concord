@@ -19,13 +19,7 @@ pub(in crate::tui::ui) fn render_message_url_picker(
         message_url_picker_lines(&urls, selected),
         popup.width.saturating_sub(2) as usize,
     );
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(panel_block("Open URL", true))
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
+    render_modal_paragraph(frame, popup, "Open URL", lines);
 }
 
 pub(in crate::tui::ui) fn message_url_picker_popup_area(area: Rect, url_count: usize) -> Rect {

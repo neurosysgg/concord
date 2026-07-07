@@ -12,12 +12,10 @@ pub(in crate::tui::ui) fn render_options_popup(
     let items = state.display_option_items();
     let selected = state.selected_option_index().unwrap_or(0);
     let popup = options_popup_area(area, state);
-    let block = panel_block(state.options_popup_title(), true);
-    let inner = block.inner(popup);
+    let inner = render_modal_frame(frame, popup, state.options_popup_title());
     let visible_items = usize::from(inner.height).max(1);
     let inner_width = usize::from(inner.width).max(1);
     let scroll = state.options_popup_scroll();
-    frame.render_widget(Clear, popup);
     frame.render_widget(
         Paragraph::new(options_popup_lines(
             &items,
@@ -25,9 +23,8 @@ pub(in crate::tui::ui) fn render_options_popup(
             visible_items,
             scroll,
             inner_width,
-        ))
-        .block(block),
-        popup,
+        )),
+        inner,
     );
     render_option_gauges(frame, inner, &items, visible_items, scroll);
 }

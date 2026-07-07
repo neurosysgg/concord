@@ -22,13 +22,7 @@ pub(in crate::tui::ui) fn render_debug_log_popup(
         usize::from(popup_width.saturating_sub(2)),
     );
     let popup = debug_log_popup_area(area, lines.len());
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(panel_block("Debug logs", true))
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
+    render_modal_paragraph(frame, popup, "Debug logs", lines);
 }
 
 pub(in crate::tui::ui) fn debug_log_popup_area(area: Rect, line_count: usize) -> Rect {

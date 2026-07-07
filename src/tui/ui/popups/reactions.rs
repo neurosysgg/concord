@@ -28,12 +28,10 @@ pub(in crate::tui::ui) fn render_emoji_reaction_picker(
         .iter()
         .map(|image| image.url.clone())
         .collect::<Vec<_>>();
-    let block = panel_block("Choose reaction", true);
-    let content = block.inner(popup);
+    let content = render_modal_frame(frame, popup, "Choose reaction");
     let visible_items =
         emoji_reaction_picker_visible_items_for_area(area, reactions.len(), filter.is_some());
     let scroll = state.emoji_reaction_picker_scroll();
-    frame.render_widget(Clear, popup);
     frame.render_widget(
         Paragraph::new(emoji_reaction_picker_lines_with_custom_emoji_images(
             reactions,
@@ -49,9 +47,8 @@ pub(in crate::tui::ui) fn render_emoji_reaction_picker(
                 max_width: usize::from(content.width),
             },
         ))
-        .block(block)
         .wrap(Wrap { trim: false }),
-        popup,
+        content,
     );
     if state.show_custom_emoji() {
         render_emoji_reaction_images(
@@ -145,10 +142,8 @@ fn render_reaction_list(
     );
 
     let popup = reaction_users_popup_area(area, lines.len());
-    frame.render_widget(Clear, popup);
-    let block = panel_block("Reactions", true);
-    let content = block.inner(popup);
-    frame.render_widget(Paragraph::new(lines).block(block), popup);
+    let content = render_modal_frame(frame, popup, "Reactions");
+    frame.render_widget(Paragraph::new(lines), content);
 
     if state.show_custom_emoji() {
         render_reaction_list_images(
@@ -195,11 +190,8 @@ fn render_reaction_user_list(
     );
 
     let popup = reaction_users_popup_area(area, lines.len());
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines).block(panel_block_owned(title, true)),
-        popup,
-    );
+    let content = render_modal_frame(frame, popup, title);
+    frame.render_widget(Paragraph::new(lines), content);
     // Pad the scrollbar total by one while more pages remain so the bar never
     // quite reaches the bottom, hinting that scrolling further loads more.
     let scrollbar_total = popup_state.user_line_count() + usize::from(entry.has_more());

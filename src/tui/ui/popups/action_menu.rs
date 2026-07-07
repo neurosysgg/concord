@@ -16,15 +16,11 @@ pub(in crate::tui::ui) fn render_leader_popup(
 
     let lines = leader_popup_lines(state, area.height.saturating_sub(2) as usize);
     let popup = leader_popup_area(area, &lines);
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(truncate_leader_lines(
-            lines,
-            popup.width.saturating_sub(2) as usize,
-        ))
-        .block(panel_block_owned(leader_popup_title(state), true))
-        .wrap(Wrap { trim: false }),
+    render_modal_paragraph(
+        frame,
         popup,
+        leader_popup_title(state),
+        truncate_leader_lines(lines, popup.width.saturating_sub(2) as usize),
     );
 }
 
@@ -336,13 +332,7 @@ pub(in crate::tui::ui) fn render_message_action_menu(
 
     let popup = message_action_menu_area(area, actions.len());
     let lines = truncate_action_menu_lines(lines, popup.width.saturating_sub(2) as usize);
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(panel_block("Message actions", true))
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
+    render_modal_paragraph(frame, popup, "Message actions", lines);
 }
 
 pub(in crate::tui::ui) fn message_action_menu_area(area: Rect, action_count: usize) -> Rect {
@@ -490,13 +480,7 @@ pub(in crate::tui::ui) fn render_thread_action_menu(
 
     let popup = message_action_menu_area(area, lines.len());
     let lines = truncate_action_menu_lines(lines, popup.width.saturating_sub(2) as usize);
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(panel_block_owned(title, true))
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
+    render_modal_paragraph(frame, popup, title, lines);
 }
 
 fn thread_action_line(label: &str, selected: bool, enabled: bool) -> Line<'static> {

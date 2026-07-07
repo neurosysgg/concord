@@ -15,11 +15,7 @@ pub(in crate::tui::ui) fn render_user_profile_popup(
     }
 
     let popup = user_profile_popup_area(area);
-    frame.render_widget(Clear, popup);
-
-    let block = panel_block("Profile", true);
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner = render_modal_frame(frame, popup, "Profile");
 
     // The avatar sits inside the inner area, so reserve a fixed column gutter
     // so the text section starts cleanly to its right.

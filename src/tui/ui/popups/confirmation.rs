@@ -22,7 +22,6 @@ pub(in crate::tui::ui) fn render_message_confirmation(
         state.active_confirmation_button(),
     );
     let popup = message_confirmation_popup_area(area, lines.len());
-    frame.render_widget(Clear, popup);
     render_modal_paragraph(frame, popup, kind.title(), lines);
 }
 
@@ -37,7 +36,6 @@ pub(in crate::tui::ui) fn render_quit_confirmation(
 
     let lines = quit_confirmation_popup_lines(state.active_confirmation_button());
     let popup = quit_confirmation_popup_area(area);
-    frame.render_widget(Clear, popup);
     render_modal_paragraph(frame, popup, "Quit", lines);
 }
 
@@ -56,7 +54,6 @@ pub(in crate::tui::ui) fn render_guild_leave_confirmation(
 
     let lines = guild_leave_confirmation_lines(&name, 56, state.active_confirmation_button());
     let popup = guild_leave_confirmation_popup_area(area, lines.len());
-    frame.render_widget(Clear, popup);
     render_modal_paragraph(frame, popup, "Leave server?", lines);
 }
 
@@ -76,13 +73,7 @@ pub(in crate::tui::ui) fn render_thread_delete_confirmation(
     let lines =
         thread_delete_confirmation_lines(&name, noun, 56, state.active_confirmation_button());
     let popup = thread_delete_confirmation_popup_area(area, lines.len());
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(panel_block_owned(format!("Delete {noun}?"), true))
-            .wrap(Wrap { trim: false }),
-        popup,
-    );
+    render_modal_paragraph(frame, popup, format!("Delete {noun}?"), lines);
 }
 
 pub(in crate::tui::ui) fn render_notification_inbox_mark_all_confirmation(
@@ -101,7 +92,6 @@ pub(in crate::tui::ui) fn render_notification_inbox_mark_all_confirmation(
     let lines =
         notification_inbox_mark_all_confirmation_lines(tab, state.active_confirmation_button());
     let popup = message_confirmation_popup_area(area, lines.len());
-    frame.render_widget(Clear, popup);
     render_modal_paragraph(frame, popup, "Mark read?", lines);
 }
 

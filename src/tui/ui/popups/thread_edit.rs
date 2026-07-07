@@ -39,14 +39,12 @@ pub(in crate::tui::ui) fn render_thread_edit(
     };
 
     let popup = thread_edit_popup_area(area);
-    frame.render_widget(Clear, popup);
     let title = if view.is_forum_post {
         "Edit Forum Post"
     } else {
         "Edit Thread"
     };
-    let block = panel_block(title, true);
-    let inner = block.inner(popup);
+    let inner = render_modal_frame(frame, popup, title);
     // Reserve the rightmost column for the scrollbar so long content never
     // collides with it.
     let content_width = usize::from(inner.width.saturating_sub(1)).max(1);
@@ -65,7 +63,7 @@ pub(in crate::tui::ui) fn render_thread_edit(
         .take(viewport)
         .cloned()
         .collect();
-    frame.render_widget(Paragraph::new(visible).block(block), popup);
+    frame.render_widget(Paragraph::new(visible), inner);
     render_vertical_scrollbar(frame, inner, scroll, viewport, total);
 
     if let Some((row, column)) = layout.cursor
@@ -247,15 +245,13 @@ pub(in crate::tui::ui) fn render_thread_edit_tag_picker(
     }
     let tags = &view.tags;
     let popup = thread_edit_tag_picker_popup_area(area, tags.len());
-    let block = panel_block("Choose tags", true);
-    let content = block.inner(popup);
+    let content = render_modal_frame(frame, popup, "Choose tags");
     let visible_items = usize::from(content.height)
         .min(TAG_PICKER_VISIBLE_ITEMS)
         .min(tags.len())
         .max(1);
     let visible_range = selection::visible_window(view.tag_scroll, visible_items, tags.len());
     let ready_urls = ready_emoji_urls(emoji_images);
-    frame.render_widget(Clear, popup);
     let rows: Vec<Line<'static>> = tags[visible_range.clone()]
         .iter()
         .map(|tag| {
@@ -266,10 +262,7 @@ pub(in crate::tui::ui) fn render_thread_edit_tag_picker(
             )
         })
         .collect();
-    frame.render_widget(
-        Paragraph::new(rows).block(block).wrap(Wrap { trim: false }),
-        popup,
-    );
+    frame.render_widget(Paragraph::new(rows).wrap(Wrap { trim: false }), content);
     if state.show_custom_emoji() {
         render_tag_picker_emojis(
             frame,

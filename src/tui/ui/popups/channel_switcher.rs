@@ -20,9 +20,11 @@ pub(in crate::tui::ui) fn render_channel_switcher_popup(
     let popup = channel_switcher_popup_area(area);
     let max_result_lines = usize::from(popup.height.saturating_sub(4)).max(1);
     let scroll = state.channel_switcher_scroll();
-    frame.render_widget(Clear, popup);
-    frame.render_widget(
-        Paragraph::new(channel_switcher_lines(
+    render_modal_paragraph(
+        frame,
+        popup,
+        "Channel Switcher",
+        channel_switcher_lines(
             &items,
             selected,
             query,
@@ -30,10 +32,7 @@ pub(in crate::tui::ui) fn render_channel_switcher_popup(
             max_result_lines,
             scroll,
             popup.width.saturating_sub(2) as usize,
-        ))
-        .block(panel_block("Channel Switcher", true))
-        .wrap(Wrap { trim: false }),
-        popup,
+        ),
     );
     if let Some(position) = channel_switcher_cursor_position(area, state) {
         frame.set_cursor_position(position);
