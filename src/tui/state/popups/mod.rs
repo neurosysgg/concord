@@ -1572,6 +1572,7 @@ impl DashboardState {
                 }
                 true
             }
+            Some(ActiveModalPopupKind::UserProfile) if self.is_user_profile_popup_editing() => false,
             Some(ActiveModalPopupKind::UserProfile) => {
                 if let Some(popup) = self.popups.user_profile_popup_mut() {
                     popup.scroll.page(action);

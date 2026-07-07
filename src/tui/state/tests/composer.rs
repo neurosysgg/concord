@@ -6,6 +6,7 @@ use crate::discord::{
 };
 use crate::tui::keybindings::ScrollAction;
 use crate::tui::state::{ActiveModalPopupKind, ForumPostComposerField, LocalUploadPreviewView};
+use crate::tui::text_input::TextEditAction;
 use serde_json::json;
 
 const PERM_ATTACH_FILES: u64 = 0x0000_0000_0000_8000;
@@ -408,14 +409,14 @@ fn forum_post_body_cursor_moves_up_and_down_across_lines() {
         .forum_post_composer_view()
         .map(|view| view.body_cursor)
         .unwrap();
-    state.move_forum_post_cursor_up();
+    state.edit_forum_post_active_text_input(TextEditAction::MoveCursorUp);
     let up = state
         .forum_post_composer_view()
         .map(|view| view.body_cursor)
         .unwrap();
     assert!(up < end, "moving up should land on the first line");
 
-    state.move_forum_post_cursor_down();
+    state.edit_forum_post_active_text_input(TextEditAction::MoveCursorDown);
     assert_eq!(
         state
             .forum_post_composer_view()

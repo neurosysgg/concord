@@ -1784,7 +1784,7 @@ mod tests {
         );
         assert_eq!(
             key_bindings.composer_action(KeyEvent::new(KeyCode::Backspace, KeyModifiers::ALT)),
-            ComposerAction::DeletePreviousWord
+            ComposerAction::EditText(crate::tui::text_input::TextEditAction::DeletePreviousWord)
         );
         assert_eq!(
             key_bindings.composer_action(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL)),
@@ -1835,12 +1835,16 @@ mod tests {
         assert_eq!(
             key_bindings
                 .profile_popup_action(KeyEvent::new(KeyCode::Backspace, KeyModifiers::ALT), true),
-            Some(ProfilePopupAction::DeletePreviousWord)
+            Some(ProfilePopupAction::EditText(
+                crate::tui::text_input::TextEditAction::DeletePreviousWord,
+            ))
         );
         assert_eq!(
             key_bindings
                 .profile_popup_action(KeyEvent::new(KeyCode::Left, KeyModifiers::ALT), true),
-            Some(ProfilePopupAction::MoveCursorLeft)
+            Some(ProfilePopupAction::EditText(
+                crate::tui::text_input::TextEditAction::MoveCursorLeft,
+            ))
         );
     }
 

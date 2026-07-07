@@ -4,6 +4,7 @@ use crate::discord::ids::{
     marker::{ChannelMarker, ForumTagMarker},
 };
 use crate::tui::keybindings::ScrollAction;
+use crate::tui::text_input::TextEditAction;
 
 use super::super::scroll::clamp_list_scroll;
 use super::super::{DashboardState, ThreadEditField, ThreadEditTagView, ThreadEditView};
@@ -376,74 +377,12 @@ impl super::super::DashboardState {
         true
     }
 
-    pub fn delete_thread_edit_previous_char(&mut self) {
+    pub fn edit_thread_edit_title_input(&mut self, action: TextEditAction) {
         if let Some(popup) = self.popups.thread_edit_mut()
             && popup.editing_title
-            && popup.edit_input.delete_previous_grapheme()
+            && popup.edit_input.apply_edit_action(action)
         {
             popup.status = None;
-        }
-    }
-
-    pub fn delete_thread_edit_previous_word(&mut self) {
-        if let Some(popup) = self.popups.thread_edit_mut()
-            && popup.editing_title
-            && popup.edit_input.delete_previous_word()
-        {
-            popup.status = None;
-        }
-    }
-
-    pub fn delete_thread_edit_to_line_start(&mut self) {
-        if let Some(popup) = self.popups.thread_edit_mut()
-            && popup.editing_title
-            && popup.edit_input.delete_to_line_start()
-        {
-            popup.status = None;
-        }
-    }
-
-    pub fn delete_thread_edit_to_line_end(&mut self) {
-        if let Some(popup) = self.popups.thread_edit_mut()
-            && popup.editing_title
-            && popup.edit_input.delete_to_line_end()
-        {
-            popup.status = None;
-        }
-    }
-
-    pub fn move_thread_edit_cursor_left(&mut self) {
-        self.with_thread_edit_title_input(|input| input.move_left());
-    }
-
-    pub fn move_thread_edit_cursor_right(&mut self) {
-        self.with_thread_edit_title_input(|input| input.move_right());
-    }
-
-    pub fn move_thread_edit_cursor_word_left(&mut self) {
-        self.with_thread_edit_title_input(|input| input.move_word_left());
-    }
-
-    pub fn move_thread_edit_cursor_word_right(&mut self) {
-        self.with_thread_edit_title_input(|input| input.move_word_right());
-    }
-
-    pub fn move_thread_edit_cursor_home(&mut self) {
-        self.with_thread_edit_title_input(|input| input.move_home());
-    }
-
-    pub fn move_thread_edit_cursor_end(&mut self) {
-        self.with_thread_edit_title_input(|input| input.move_end());
-    }
-
-    fn with_thread_edit_title_input(
-        &mut self,
-        action: impl FnOnce(&mut crate::tui::text_input::TextInputState),
-    ) {
-        if let Some(popup) = self.popups.thread_edit_mut()
-            && popup.editing_title
-        {
-            action(&mut popup.edit_input);
         }
     }
 

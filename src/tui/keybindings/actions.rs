@@ -1,5 +1,6 @@
 use crate::discord::password_auth::MfaMethod;
 use crate::tui::state::{FocusPane, MessageActionKind};
+use crate::tui::text_input::TextEditAction;
 
 use super::KeyChord;
 
@@ -282,16 +283,7 @@ pub(in crate::tui) enum ProfilePopupAction {
     PasteClipboard,
     Save,
     SignOut,
-    DeleteChar,
-    DeletePreviousWord,
-    DeleteToLineStart,
-    DeleteToLineEnd,
-    MoveCursorLeft,
-    MoveCursorRight,
-    MoveCursorWordLeft,
-    MoveCursorWordRight,
-    MoveCursorHome,
-    MoveCursorEnd,
+    EditText(TextEditAction),
     InsertChar(char),
 }
 
@@ -367,18 +359,7 @@ pub(in crate::tui) enum ComposerAction {
     Close,
     ClearInput,
     RemoveLastAttachment,
-    DeletePreviousChar,
-    DeletePreviousWord,
-    DeleteToLineStart,
-    DeleteToLineEnd,
-    MoveCursorUp,
-    MoveCursorDown,
-    MoveCursorWordLeft,
-    MoveCursorLeft,
-    MoveCursorWordRight,
-    MoveCursorRight,
-    MoveCursorHome,
-    MoveCursorEnd,
+    EditText(TextEditAction),
     ToggleReplyPing,
     InsertChar(char),
     Ignore,

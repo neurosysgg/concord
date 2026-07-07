@@ -35,7 +35,7 @@ use super::completions::{
 };
 use crate::discord::{AppCommand, ReplyReference};
 use crate::tui::text_cursor::{previous_char_boundary, previous_word_boundary};
-use crate::tui::text_input::TextInputState;
+use crate::tui::text_input::{TextEditAction, TextInputState};
 
 /// Why the composer is locked in a DM. Drives both the send gate and the hint.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -602,6 +602,23 @@ impl DashboardState {
                 start + offset
             });
         self.replace_composer_range(start..end, "");
+    }
+
+    pub fn edit_composer_text_input(&mut self, action: TextEditAction) {
+        match action {
+            TextEditAction::DeletePreviousChar => self.pop_composer_char(),
+            TextEditAction::DeletePreviousWord => self.delete_previous_composer_word(),
+            TextEditAction::DeleteToLineStart => self.delete_composer_to_line_start(),
+            TextEditAction::DeleteToLineEnd => self.delete_composer_to_line_end(),
+            TextEditAction::MoveCursorUp => self.move_composer_cursor_up(),
+            TextEditAction::MoveCursorDown => self.move_composer_cursor_down(),
+            TextEditAction::MoveCursorWordLeft => self.move_composer_cursor_word_left(),
+            TextEditAction::MoveCursorLeft => self.move_composer_cursor_left(),
+            TextEditAction::MoveCursorWordRight => self.move_composer_cursor_word_right(),
+            TextEditAction::MoveCursorRight => self.move_composer_cursor_right(),
+            TextEditAction::MoveCursorHome => self.move_composer_cursor_home(),
+            TextEditAction::MoveCursorEnd => self.move_composer_cursor_end(),
+        }
     }
 
     pub fn move_composer_cursor_left(&mut self) {

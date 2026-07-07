@@ -6,6 +6,7 @@ use crate::discord::{
     AppCommand, ForumPostCreate, MAX_UPLOAD_ATTACHMENT_COUNT, MessageAttachmentUpload,
 };
 use crate::tui::keybindings::ScrollAction;
+use crate::tui::text_input::TextEditAction;
 use ratatui_image::protocol::Protocol;
 
 use super::super::composer::expand_emoji_shortcodes;
@@ -294,11 +295,11 @@ impl DashboardState {
         true
     }
 
-    pub fn delete_forum_post_previous_char(&mut self) {
+    pub fn edit_forum_post_active_text_input(&mut self, action: TextEditAction) {
         if let Some(popup) = self.popups.forum_post_composer_mut() {
             let changed = match popup.editing {
                 Some(ForumPostComposerFieldState::Title | ForumPostComposerFieldState::Body) => {
-                    popup.edit_input.delete_previous_grapheme()
+                    popup.edit_input.apply_edit_action(action)
                 }
                 Some(
                     ForumPostComposerFieldState::Attachments
@@ -311,119 +312,6 @@ impl DashboardState {
             if changed {
                 popup.status = None;
             }
-        }
-    }
-
-    pub fn delete_forum_post_previous_word(&mut self) {
-        if let Some(popup) = self.popups.forum_post_composer_mut() {
-            let changed = match popup.editing {
-                Some(ForumPostComposerFieldState::Title | ForumPostComposerFieldState::Body) => {
-                    popup.edit_input.delete_previous_word()
-                }
-                Some(
-                    ForumPostComposerFieldState::Attachments
-                    | ForumPostComposerFieldState::Tags
-                    | ForumPostComposerFieldState::Submit
-                    | ForumPostComposerFieldState::Cancel,
-                )
-                | None => false,
-            };
-            if changed {
-                popup.status = None;
-            }
-        }
-    }
-
-    pub fn delete_forum_post_to_line_start(&mut self) {
-        if let Some(popup) = self.popups.forum_post_composer_mut() {
-            let changed = match popup.editing {
-                Some(ForumPostComposerFieldState::Title | ForumPostComposerFieldState::Body) => {
-                    popup.edit_input.delete_to_line_start()
-                }
-                Some(
-                    ForumPostComposerFieldState::Attachments
-                    | ForumPostComposerFieldState::Tags
-                    | ForumPostComposerFieldState::Submit
-                    | ForumPostComposerFieldState::Cancel,
-                )
-                | None => false,
-            };
-            if changed {
-                popup.status = None;
-            }
-        }
-    }
-
-    pub fn delete_forum_post_to_line_end(&mut self) {
-        if let Some(popup) = self.popups.forum_post_composer_mut() {
-            let changed = match popup.editing {
-                Some(ForumPostComposerFieldState::Title | ForumPostComposerFieldState::Body) => {
-                    popup.edit_input.delete_to_line_end()
-                }
-                Some(
-                    ForumPostComposerFieldState::Attachments
-                    | ForumPostComposerFieldState::Tags
-                    | ForumPostComposerFieldState::Submit
-                    | ForumPostComposerFieldState::Cancel,
-                )
-                | None => false,
-            };
-            if changed {
-                popup.status = None;
-            }
-        }
-    }
-
-    pub fn move_forum_post_cursor_left(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_left());
-    }
-
-    pub fn move_forum_post_cursor_right(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_right());
-    }
-
-    pub fn move_forum_post_cursor_word_left(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_word_left());
-    }
-
-    pub fn move_forum_post_cursor_word_right(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_word_right());
-    }
-
-    pub fn move_forum_post_cursor_up(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_up());
-    }
-
-    pub fn move_forum_post_cursor_down(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_down());
-    }
-
-    pub fn move_forum_post_cursor_home(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_home());
-    }
-
-    pub fn move_forum_post_cursor_end(&mut self) {
-        self.with_forum_post_active_text_input(|input| input.move_end());
-    }
-
-    fn with_forum_post_active_text_input(
-        &mut self,
-        action: impl FnOnce(&mut crate::tui::text_input::TextInputState),
-    ) {
-        let Some(popup) = self.popups.forum_post_composer_mut() else {
-            return;
-        };
-        match popup.editing {
-            Some(ForumPostComposerFieldState::Title | ForumPostComposerFieldState::Body) => {
-                action(&mut popup.edit_input)
-            }
-            Some(
-                ForumPostComposerFieldState::Attachments
-                | ForumPostComposerFieldState::Tags
-                | ForumPostComposerFieldState::Submit
-                | ForumPostComposerFieldState::Cancel,
-            )
-            | None => {}
         }
     }
 

@@ -353,23 +353,12 @@ impl KeyBindings {
             ComposerAction::PasteClipboard => Some(ProfilePopupAction::PasteClipboard),
             ComposerAction::Submit => Some(ProfilePopupAction::StartOrCommitEdit),
             ComposerAction::Close => Some(ProfilePopupAction::Close),
-            ComposerAction::DeletePreviousChar => Some(ProfilePopupAction::DeleteChar),
-            ComposerAction::DeletePreviousWord => Some(ProfilePopupAction::DeletePreviousWord),
-            ComposerAction::DeleteToLineStart => Some(ProfilePopupAction::DeleteToLineStart),
-            ComposerAction::DeleteToLineEnd => Some(ProfilePopupAction::DeleteToLineEnd),
-            ComposerAction::MoveCursorWordLeft => Some(ProfilePopupAction::MoveCursorWordLeft),
-            ComposerAction::MoveCursorLeft => Some(ProfilePopupAction::MoveCursorLeft),
-            ComposerAction::MoveCursorWordRight => Some(ProfilePopupAction::MoveCursorWordRight),
-            ComposerAction::MoveCursorRight => Some(ProfilePopupAction::MoveCursorRight),
-            ComposerAction::MoveCursorHome => Some(ProfilePopupAction::MoveCursorHome),
-            ComposerAction::MoveCursorEnd => Some(ProfilePopupAction::MoveCursorEnd),
             ComposerAction::InsertChar(value) => Some(ProfilePopupAction::InsertChar(value)),
+            ComposerAction::EditText(action) => Some(ProfilePopupAction::EditText(action)),
             ComposerAction::OpenInEditor
             | ComposerAction::InsertNewline
             | ComposerAction::ClearInput
             | ComposerAction::RemoveLastAttachment
-            | ComposerAction::MoveCursorUp
-            | ComposerAction::MoveCursorDown
             | ComposerAction::ToggleReplyPing
             | ComposerAction::Ignore => None,
         }

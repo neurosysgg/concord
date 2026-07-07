@@ -7,6 +7,7 @@ use crate::discord::{
     MessageAttachmentUpload, ProfileAvatarUpload, UserProfileUpdate,
 };
 use crate::tui::state::UserProfileSettingsField;
+use crate::tui::text_input::TextEditAction;
 
 #[test]
 fn opening_profile_uses_cache_for_same_guild() {
@@ -264,7 +265,7 @@ fn profile_settings_text_editing_uses_cursor() {
 
     let _ = state.start_or_commit_user_profile_edit();
     state.insert_user_profile_edit_text("hello world");
-    state.move_user_profile_edit_cursor_word_left();
+    state.edit_user_profile_text_input(TextEditAction::MoveCursorWordLeft);
     state.insert_user_profile_edit_text("brave ");
 
     assert_eq!(
@@ -272,16 +273,16 @@ fn profile_settings_text_editing_uses_cursor() {
         "hello brave world"
     );
 
-    state.delete_previous_user_profile_edit_word();
+    state.edit_user_profile_text_input(TextEditAction::DeletePreviousWord);
     assert_eq!(
         state.user_profile_settings_field_value(UserProfileSettingsField::GlobalDisplayName),
         "hello world"
     );
 
-    state.move_user_profile_edit_cursor_home();
+    state.edit_user_profile_text_input(TextEditAction::MoveCursorHome);
     state.insert_user_profile_edit_text("Neo ");
-    state.move_user_profile_edit_cursor_end();
-    state.pop_user_profile_edit_char();
+    state.edit_user_profile_text_input(TextEditAction::MoveCursorEnd);
+    state.edit_user_profile_text_input(TextEditAction::DeletePreviousChar);
 
     assert_eq!(
         state.user_profile_settings_field_value(UserProfileSettingsField::GlobalDisplayName),
@@ -300,8 +301,8 @@ fn profile_settings_text_cursor_handles_graphemes() {
 
     let _ = state.start_or_commit_user_profile_edit();
     state.insert_user_profile_edit_text("가🇰🇷나");
-    state.move_user_profile_edit_cursor_left();
-    state.pop_user_profile_edit_char();
+    state.edit_user_profile_text_input(TextEditAction::MoveCursorLeft);
+    state.edit_user_profile_text_input(TextEditAction::DeletePreviousChar);
 
     assert_eq!(
         state.user_profile_settings_field_value(UserProfileSettingsField::GlobalDisplayName),

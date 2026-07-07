@@ -8,7 +8,7 @@ use crate::discord::{
     UserProfileUpdate,
 };
 use crate::tui::keybindings::KeyChord;
-use crate::tui::text_input::TextInputState;
+use crate::tui::text_input::TextEditAction;
 
 use super::super::model::{FocusPane, MemberActionItem, MemberActionKind};
 use super::super::{ActiveGuildScope, DashboardState};
@@ -643,82 +643,14 @@ impl DashboardState {
         }
     }
 
-    pub fn pop_user_profile_edit_char(&mut self) {
+    pub fn edit_user_profile_text_input(&mut self, action: TextEditAction) {
         if !self.is_current_user_profile_popup() {
             return;
         }
         if let Some(popup) = self.popups.user_profile_popup_mut()
             && popup.settings.editing.is_some()
         {
-            popup.settings.edit_input.delete_previous_grapheme();
-        }
-    }
-
-    pub fn delete_previous_user_profile_edit_word(&mut self) {
-        if !self.is_current_user_profile_popup() {
-            return;
-        }
-        if let Some(popup) = self.popups.user_profile_popup_mut()
-            && popup.settings.editing.is_some()
-        {
-            popup.settings.edit_input.delete_previous_word();
-        }
-    }
-
-    pub fn delete_user_profile_edit_to_line_start(&mut self) {
-        if !self.is_current_user_profile_popup() {
-            return;
-        }
-        if let Some(popup) = self.popups.user_profile_popup_mut()
-            && popup.settings.editing.is_some()
-        {
-            popup.settings.edit_input.delete_to_line_start();
-        }
-    }
-
-    pub fn delete_user_profile_edit_to_line_end(&mut self) {
-        if !self.is_current_user_profile_popup() {
-            return;
-        }
-        if let Some(popup) = self.popups.user_profile_popup_mut()
-            && popup.settings.editing.is_some()
-        {
-            popup.settings.edit_input.delete_to_line_end();
-        }
-    }
-
-    pub fn move_user_profile_edit_cursor_left(&mut self) {
-        self.move_user_profile_edit_cursor_with(|input| input.move_left());
-    }
-
-    pub fn move_user_profile_edit_cursor_right(&mut self) {
-        self.move_user_profile_edit_cursor_with(|input| input.move_right());
-    }
-
-    pub fn move_user_profile_edit_cursor_word_left(&mut self) {
-        self.move_user_profile_edit_cursor_with(|input| input.move_word_left());
-    }
-
-    pub fn move_user_profile_edit_cursor_word_right(&mut self) {
-        self.move_user_profile_edit_cursor_with(|input| input.move_word_right());
-    }
-
-    pub fn move_user_profile_edit_cursor_home(&mut self) {
-        self.move_user_profile_edit_cursor_with(|input| input.move_home());
-    }
-
-    pub fn move_user_profile_edit_cursor_end(&mut self) {
-        self.move_user_profile_edit_cursor_with(|input| input.move_end());
-    }
-
-    fn move_user_profile_edit_cursor_with(&mut self, update: impl FnOnce(&mut TextInputState)) {
-        if !self.is_current_user_profile_popup() {
-            return;
-        }
-        if let Some(popup) = self.popups.user_profile_popup_mut()
-            && popup.settings.editing.is_some()
-        {
-            update(&mut popup.settings.edit_input);
+            popup.settings.edit_input.apply_edit_action(action);
         }
     }
 

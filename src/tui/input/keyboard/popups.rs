@@ -20,6 +20,8 @@ pub(super) fn handle_popup_key(
     key: KeyEvent,
     phase: PopupKeyPhase,
 ) -> Option<Option<AppCommand>> {
+    let kind = state.active_modal_popup_kind()?;
+
     if phase == PopupKeyPhase::Priority && !state.key_bindings().is_popup_close_key(key) {
         match state.key_bindings().popup_page_action(key) {
             // Paging to the bottom of a reactor list must still fetch the next page.
@@ -33,7 +35,6 @@ pub(super) fn handle_popup_key(
         }
     }
 
-    let kind = state.active_modal_popup_kind()?;
     if popup_key_phase(kind) != phase {
         return None;
     }
@@ -139,7 +140,9 @@ pub(super) fn handle_forum_post_composer_key(
         _ => {}
     }
 
-    match state.key_bindings().composer_action(key) {
+    let action = state.key_bindings().composer_action(key);
+
+    match action {
         ComposerAction::Submit => return state.activate_forum_post_composer(),
         ComposerAction::Close => state.close_or_cancel_forum_post_composer(),
         ComposerAction::ClearInput => state.clear_forum_post_active_field(),
@@ -147,18 +150,7 @@ pub(super) fn handle_forum_post_composer_key(
         ComposerAction::OpenInEditor
         | ComposerAction::PasteClipboard
         | ComposerAction::InsertNewline
-        | ComposerAction::DeletePreviousChar
-        | ComposerAction::DeletePreviousWord
-        | ComposerAction::DeleteToLineStart
-        | ComposerAction::DeleteToLineEnd
-        | ComposerAction::MoveCursorUp
-        | ComposerAction::MoveCursorDown
-        | ComposerAction::MoveCursorWordLeft
-        | ComposerAction::MoveCursorLeft
-        | ComposerAction::MoveCursorWordRight
-        | ComposerAction::MoveCursorRight
-        | ComposerAction::MoveCursorHome
-        | ComposerAction::MoveCursorEnd
+        | ComposerAction::EditText(_)
         | ComposerAction::InsertChar(_)
         | ComposerAction::ToggleReplyPing
         | ComposerAction::Ignore => {}
@@ -188,19 +180,8 @@ fn handle_forum_post_tag_picker_key(
         ComposerAction::OpenInEditor
         | ComposerAction::PasteClipboard
         | ComposerAction::InsertNewline
-        | ComposerAction::DeletePreviousChar
-        | ComposerAction::DeletePreviousWord
-        | ComposerAction::DeleteToLineStart
-        | ComposerAction::DeleteToLineEnd
         | ComposerAction::RemoveLastAttachment
-        | ComposerAction::MoveCursorUp
-        | ComposerAction::MoveCursorDown
-        | ComposerAction::MoveCursorWordLeft
-        | ComposerAction::MoveCursorLeft
-        | ComposerAction::MoveCursorWordRight
-        | ComposerAction::MoveCursorRight
-        | ComposerAction::MoveCursorHome
-        | ComposerAction::MoveCursorEnd
+        | ComposerAction::EditText(_)
         | ComposerAction::InsertChar(_)
         | ComposerAction::ToggleReplyPing
         | ComposerAction::Ignore => {}
@@ -212,27 +193,18 @@ fn handle_forum_post_composer_edit_key(
     state: &mut DashboardState,
     key: KeyEvent,
 ) -> Option<AppCommand> {
-    match state.key_bindings().composer_action(key) {
+    let action = state.key_bindings().composer_action(key);
+
+    match action {
         ComposerAction::PasteClipboard => state.request_paste_clipboard(),
         ComposerAction::InsertNewline => state.push_forum_post_char('\n'),
         ComposerAction::Submit => return state.activate_forum_post_composer(),
         ComposerAction::Close => state.close_or_cancel_forum_post_composer(),
         ComposerAction::ClearInput => state.clear_forum_post_active_field(),
-        ComposerAction::DeletePreviousChar => state.delete_forum_post_previous_char(),
-        ComposerAction::DeletePreviousWord => state.delete_forum_post_previous_word(),
-        ComposerAction::DeleteToLineStart => state.delete_forum_post_to_line_start(),
-        ComposerAction::DeleteToLineEnd => state.delete_forum_post_to_line_end(),
-        ComposerAction::MoveCursorWordLeft => state.move_forum_post_cursor_word_left(),
-        ComposerAction::MoveCursorLeft => state.move_forum_post_cursor_left(),
-        ComposerAction::MoveCursorWordRight => state.move_forum_post_cursor_word_right(),
-        ComposerAction::MoveCursorRight => state.move_forum_post_cursor_right(),
-        ComposerAction::MoveCursorHome => state.move_forum_post_cursor_home(),
-        ComposerAction::MoveCursorEnd => state.move_forum_post_cursor_end(),
-        ComposerAction::MoveCursorUp => state.move_forum_post_cursor_up(),
-        ComposerAction::MoveCursorDown => state.move_forum_post_cursor_down(),
         ComposerAction::InsertChar(value) => state.push_forum_post_char(value),
         ComposerAction::RemoveLastAttachment => state.pop_pending_forum_post_attachment(),
         ComposerAction::OpenInEditor => state.request_open_forum_post_body_in_editor(),
+        ComposerAction::EditText(action) => state.edit_forum_post_active_text_input(action),
         ComposerAction::ToggleReplyPing => {}
         ComposerAction::Ignore => {}
     }
@@ -304,26 +276,17 @@ pub(super) fn handle_thread_edit_key(
         _ => {}
     }
 
-    match state.key_bindings().composer_action(key) {
+    let action = state.key_bindings().composer_action(key);
+
+    match action {
         ComposerAction::Submit => return state.activate_thread_edit(),
         ComposerAction::Close => state.close_or_cancel_thread_edit(),
         ComposerAction::ClearInput => state.clear_thread_edit_active_field(),
         ComposerAction::OpenInEditor
         | ComposerAction::PasteClipboard
         | ComposerAction::InsertNewline
-        | ComposerAction::DeletePreviousChar
-        | ComposerAction::DeletePreviousWord
-        | ComposerAction::DeleteToLineStart
-        | ComposerAction::DeleteToLineEnd
         | ComposerAction::RemoveLastAttachment
-        | ComposerAction::MoveCursorUp
-        | ComposerAction::MoveCursorDown
-        | ComposerAction::MoveCursorWordLeft
-        | ComposerAction::MoveCursorLeft
-        | ComposerAction::MoveCursorWordRight
-        | ComposerAction::MoveCursorRight
-        | ComposerAction::MoveCursorHome
-        | ComposerAction::MoveCursorEnd
+        | ComposerAction::EditText(_)
         | ComposerAction::InsertChar(_)
         | ComposerAction::ToggleReplyPing
         | ComposerAction::Ignore => {}
@@ -353,19 +316,8 @@ fn handle_thread_edit_tag_picker_key(
         ComposerAction::OpenInEditor
         | ComposerAction::PasteClipboard
         | ComposerAction::InsertNewline
-        | ComposerAction::DeletePreviousChar
-        | ComposerAction::DeletePreviousWord
-        | ComposerAction::DeleteToLineStart
-        | ComposerAction::DeleteToLineEnd
         | ComposerAction::RemoveLastAttachment
-        | ComposerAction::MoveCursorUp
-        | ComposerAction::MoveCursorDown
-        | ComposerAction::MoveCursorWordLeft
-        | ComposerAction::MoveCursorLeft
-        | ComposerAction::MoveCursorWordRight
-        | ComposerAction::MoveCursorRight
-        | ComposerAction::MoveCursorHome
-        | ComposerAction::MoveCursorEnd
+        | ComposerAction::EditText(_)
         | ComposerAction::InsertChar(_)
         | ComposerAction::ToggleReplyPing
         | ComposerAction::Ignore => {}
@@ -374,27 +326,18 @@ fn handle_thread_edit_tag_picker_key(
 }
 
 fn handle_thread_edit_title_key(state: &mut DashboardState, key: KeyEvent) -> Option<AppCommand> {
-    match state.key_bindings().composer_action(key) {
+    let action = state.key_bindings().composer_action(key);
+
+    match action {
         ComposerAction::PasteClipboard => state.request_paste_clipboard(),
         ComposerAction::Submit => return state.activate_thread_edit(),
         ComposerAction::Close => state.close_or_cancel_thread_edit(),
         ComposerAction::ClearInput => state.clear_thread_edit_active_field(),
-        ComposerAction::DeletePreviousChar => state.delete_thread_edit_previous_char(),
-        ComposerAction::DeletePreviousWord => state.delete_thread_edit_previous_word(),
-        ComposerAction::DeleteToLineStart => state.delete_thread_edit_to_line_start(),
-        ComposerAction::DeleteToLineEnd => state.delete_thread_edit_to_line_end(),
-        ComposerAction::MoveCursorWordLeft => state.move_thread_edit_cursor_word_left(),
-        ComposerAction::MoveCursorLeft => state.move_thread_edit_cursor_left(),
-        ComposerAction::MoveCursorWordRight => state.move_thread_edit_cursor_word_right(),
-        ComposerAction::MoveCursorRight => state.move_thread_edit_cursor_right(),
-        ComposerAction::MoveCursorHome => state.move_thread_edit_cursor_home(),
-        ComposerAction::MoveCursorEnd => state.move_thread_edit_cursor_end(),
         ComposerAction::InsertChar(value) => state.push_thread_edit_char(value),
         // The title is a single line, so newline and the vertical/editor moves
         // and attachment shortcut do nothing here.
+        ComposerAction::EditText(action) => state.edit_thread_edit_title_input(action),
         ComposerAction::InsertNewline
-        | ComposerAction::MoveCursorUp
-        | ComposerAction::MoveCursorDown
         | ComposerAction::RemoveLastAttachment
         | ComposerAction::OpenInEditor
         | ComposerAction::ToggleReplyPing
@@ -836,24 +779,7 @@ pub(super) fn handle_user_profile_popup_key(
         }
         Some(ProfilePopupAction::Save) => return state.save_user_profile_settings_command(),
         Some(ProfilePopupAction::SignOut) => return state.sign_out_command(),
-        Some(ProfilePopupAction::DeleteChar) => state.pop_user_profile_edit_char(),
-        Some(ProfilePopupAction::DeletePreviousWord) => {
-            state.delete_previous_user_profile_edit_word()
-        }
-        Some(ProfilePopupAction::DeleteToLineStart) => {
-            state.delete_user_profile_edit_to_line_start()
-        }
-        Some(ProfilePopupAction::DeleteToLineEnd) => state.delete_user_profile_edit_to_line_end(),
-        Some(ProfilePopupAction::MoveCursorLeft) => state.move_user_profile_edit_cursor_left(),
-        Some(ProfilePopupAction::MoveCursorRight) => state.move_user_profile_edit_cursor_right(),
-        Some(ProfilePopupAction::MoveCursorWordLeft) => {
-            state.move_user_profile_edit_cursor_word_left()
-        }
-        Some(ProfilePopupAction::MoveCursorWordRight) => {
-            state.move_user_profile_edit_cursor_word_right()
-        }
-        Some(ProfilePopupAction::MoveCursorHome) => state.move_user_profile_edit_cursor_home(),
-        Some(ProfilePopupAction::MoveCursorEnd) => state.move_user_profile_edit_cursor_end(),
+        Some(ProfilePopupAction::EditText(action)) => state.edit_user_profile_text_input(action),
         Some(ProfilePopupAction::InsertChar(value)) => state.push_user_profile_edit_char(value),
         None => {}
     }

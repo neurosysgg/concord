@@ -11,6 +11,22 @@ pub(in crate::tui) struct TextInputState {
     cursor_byte_index: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::tui) enum TextEditAction {
+    DeletePreviousChar,
+    DeletePreviousWord,
+    DeleteToLineStart,
+    DeleteToLineEnd,
+    MoveCursorUp,
+    MoveCursorDown,
+    MoveCursorWordLeft,
+    MoveCursorLeft,
+    MoveCursorWordRight,
+    MoveCursorRight,
+    MoveCursorHome,
+    MoveCursorEnd,
+}
+
 impl TextInputState {
     pub(in crate::tui) fn value(&self) -> &str {
         &self.value
@@ -94,6 +110,47 @@ impl TextInputState {
             return false;
         }
         self.replace_range(start..end, "")
+    }
+
+    pub(in crate::tui) fn apply_edit_action(&mut self, action: TextEditAction) -> bool {
+        match action {
+            TextEditAction::DeletePreviousChar => self.delete_previous_grapheme(),
+            TextEditAction::DeletePreviousWord => self.delete_previous_word(),
+            TextEditAction::DeleteToLineStart => self.delete_to_line_start(),
+            TextEditAction::DeleteToLineEnd => self.delete_to_line_end(),
+            TextEditAction::MoveCursorUp => {
+                self.move_up();
+                false
+            }
+            TextEditAction::MoveCursorDown => {
+                self.move_down();
+                false
+            }
+            TextEditAction::MoveCursorWordLeft => {
+                self.move_word_left();
+                false
+            }
+            TextEditAction::MoveCursorLeft => {
+                self.move_left();
+                false
+            }
+            TextEditAction::MoveCursorWordRight => {
+                self.move_word_right();
+                false
+            }
+            TextEditAction::MoveCursorRight => {
+                self.move_right();
+                false
+            }
+            TextEditAction::MoveCursorHome => {
+                self.move_home();
+                false
+            }
+            TextEditAction::MoveCursorEnd => {
+                self.move_end();
+                false
+            }
+        }
     }
 
     pub(in crate::tui) fn move_left(&mut self) {

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::config::{KeymapBinding, KeymapOptions};
+use crate::tui::text_input::TextEditAction;
 
 use super::{
     ComposerAction, KeyChord, KeymapBindingSummary, MAX_KEYMAP_MAPPINGS, char_chord, ctrl_chord,
@@ -193,18 +194,26 @@ impl ComposerShortcutAction {
             Self::Close => ComposerAction::Close,
             Self::ClearInput => ComposerAction::ClearInput,
             Self::RemoveLastAttachment => ComposerAction::RemoveLastAttachment,
-            Self::DeletePreviousChar => ComposerAction::DeletePreviousChar,
-            Self::DeletePreviousWord => ComposerAction::DeletePreviousWord,
-            Self::DeleteToLineStart => ComposerAction::DeleteToLineStart,
-            Self::DeleteToLineEnd => ComposerAction::DeleteToLineEnd,
-            Self::MoveCursorUp => ComposerAction::MoveCursorUp,
-            Self::MoveCursorDown => ComposerAction::MoveCursorDown,
-            Self::MoveCursorWordLeft => ComposerAction::MoveCursorWordLeft,
-            Self::MoveCursorLeft => ComposerAction::MoveCursorLeft,
-            Self::MoveCursorWordRight => ComposerAction::MoveCursorWordRight,
-            Self::MoveCursorRight => ComposerAction::MoveCursorRight,
-            Self::MoveCursorHome => ComposerAction::MoveCursorHome,
-            Self::MoveCursorEnd => ComposerAction::MoveCursorEnd,
+            Self::DeletePreviousChar => {
+                ComposerAction::EditText(TextEditAction::DeletePreviousChar)
+            }
+            Self::DeletePreviousWord => {
+                ComposerAction::EditText(TextEditAction::DeletePreviousWord)
+            }
+            Self::DeleteToLineStart => ComposerAction::EditText(TextEditAction::DeleteToLineStart),
+            Self::DeleteToLineEnd => ComposerAction::EditText(TextEditAction::DeleteToLineEnd),
+            Self::MoveCursorUp => ComposerAction::EditText(TextEditAction::MoveCursorUp),
+            Self::MoveCursorDown => ComposerAction::EditText(TextEditAction::MoveCursorDown),
+            Self::MoveCursorWordLeft => {
+                ComposerAction::EditText(TextEditAction::MoveCursorWordLeft)
+            }
+            Self::MoveCursorLeft => ComposerAction::EditText(TextEditAction::MoveCursorLeft),
+            Self::MoveCursorWordRight => {
+                ComposerAction::EditText(TextEditAction::MoveCursorWordRight)
+            }
+            Self::MoveCursorRight => ComposerAction::EditText(TextEditAction::MoveCursorRight),
+            Self::MoveCursorHome => ComposerAction::EditText(TextEditAction::MoveCursorHome),
+            Self::MoveCursorEnd => ComposerAction::EditText(TextEditAction::MoveCursorEnd),
             Self::ToggleReplyPing => ComposerAction::ToggleReplyPing,
         }
     }

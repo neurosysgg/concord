@@ -11,7 +11,9 @@ pub(super) fn handle_composer_key(state: &mut DashboardState, key: KeyEvent) -> 
         return command;
     }
 
-    match state.key_bindings().composer_action(key) {
+    let action = state.key_bindings().composer_action(key);
+
+    match action {
         ComposerAction::OpenInEditor => {
             state.request_open_composer_in_editor();
             None
@@ -37,52 +39,8 @@ pub(super) fn handle_composer_key(state: &mut DashboardState, key: KeyEvent) -> 
             state.pop_pending_composer_attachment();
             None
         }
-        ComposerAction::DeletePreviousChar => {
-            state.pop_composer_char();
-            None
-        }
-        ComposerAction::DeletePreviousWord => {
-            state.delete_previous_composer_word();
-            None
-        }
-        ComposerAction::DeleteToLineStart => {
-            state.delete_composer_to_line_start();
-            None
-        }
-        ComposerAction::DeleteToLineEnd => {
-            state.delete_composer_to_line_end();
-            None
-        }
-        ComposerAction::MoveCursorUp => {
-            state.move_composer_cursor_up();
-            None
-        }
-        ComposerAction::MoveCursorDown => {
-            state.move_composer_cursor_down();
-            None
-        }
-        ComposerAction::MoveCursorWordLeft => {
-            state.move_composer_cursor_word_left();
-            None
-        }
-        ComposerAction::MoveCursorLeft => {
-            state.move_composer_cursor_left();
-            None
-        }
-        ComposerAction::MoveCursorWordRight => {
-            state.move_composer_cursor_word_right();
-            None
-        }
-        ComposerAction::MoveCursorRight => {
-            state.move_composer_cursor_right();
-            None
-        }
-        ComposerAction::MoveCursorHome => {
-            state.move_composer_cursor_home();
-            None
-        }
-        ComposerAction::MoveCursorEnd => {
-            state.move_composer_cursor_end();
+        ComposerAction::EditText(action) => {
+            state.edit_composer_text_input(action);
             None
         }
         ComposerAction::ToggleReplyPing => {
