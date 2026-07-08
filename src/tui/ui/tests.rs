@@ -31,7 +31,7 @@ use super::{
     focus_pane_at, format_message_sent_time, forum_post_reaction_summary,
     forum_post_scrollbar_visible_count, forum_post_tag_rows_for_test, forum_post_viewport_lines,
     inline_image_preview_area, inline_image_preview_row, keymap_help_popup_lines,
-    leader_action_lines_for_test, member_display_label, member_name_style,
+    channel_action_menu_lines_for_test, member_display_label, member_name_style,
     message_action_menu_lines, message_action_menu_lines_with_keymap_options, message_author_style,
     message_body_custom_emoji_rows, message_delete_confirmation_lines, message_item_lines,
     message_pin_confirmation_lines, message_remove_embeds_confirmation_lines,

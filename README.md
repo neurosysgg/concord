@@ -641,7 +641,7 @@ LeaveServer = "l"
 FolderSettings = "r"
 
 [keymap.channel_actions]
-JoinVoice = "j"
+JoinVoice = "e"
 LeaveVoice = "l"
 ShowPinnedMessages = "p"
 ShowThreads = "t"

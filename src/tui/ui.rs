@@ -82,10 +82,11 @@ use self::popups::{
     channel_switcher_visible_items, emoji_reaction_picker_visible_items_for_area,
     forum_post_composer_metrics, forum_post_composer_popup_area,
     forum_post_tag_picker_visible_items, keymap_popup_text_area, keymap_popup_total_lines,
-    options_popup_visible_items, render_attachment_viewer, render_channel_switcher_popup,
-    render_debug_log_popup, render_downloads_popup, render_emoji_reaction_picker,
-    render_folder_settings_popup, render_forum_post_composer, render_forum_post_tag_picker,
-    render_guild_leave_confirmation, render_keymap_help_popup, render_leader_popup,
+    options_popup_visible_items, render_attachment_viewer, render_channel_action_menu,
+    render_channel_switcher_popup, render_debug_log_popup, render_downloads_popup,
+    render_emoji_reaction_picker, render_folder_settings_popup, render_forum_post_composer,
+    render_forum_post_tag_picker, render_guild_action_menu, render_guild_leave_confirmation,
+    render_keymap_help_popup, render_leader_popup, render_member_action_menu,
     render_message_action_menu, render_message_confirmation, render_message_url_picker,
     render_notification_inbox_mark_all_confirmation, render_notification_inbox_popup,
     render_options_popup, render_poll_vote_picker, render_quit_confirmation,
@@ -120,7 +121,7 @@ use self::{
         centered_viewer_preview_area, channel_switcher_cursor_position, channel_switcher_lines,
         debug_log_popup_lines, emoji_reaction_picker_lines, emoji_reaction_picker_lines_for_width,
         emoji_reaction_picker_lines_with_own_reactions, filtered_emoji_reaction_picker_lines,
-        keymap_help_popup_lines, leader_action_lines_for_test, message_action_menu_lines,
+        channel_action_menu_lines_for_test, keymap_help_popup_lines, message_action_menu_lines,
         message_action_menu_lines_with_keymap_options, message_delete_confirmation_lines,
         message_pin_confirmation_lines, message_remove_embeds_confirmation_lines,
         message_url_picker_lines_for_width, options_popup_lines, poll_vote_picker_lines,
@@ -326,6 +327,9 @@ pub(in crate::tui) fn render_with_message_viewport_plan(
         render_members(frame, areas.members, state, &emoji_images);
     }
     render_leader_popup(frame, popup_area, state);
+    render_guild_action_menu(frame, popup_area, state);
+    render_channel_action_menu(frame, popup_area, state);
+    render_member_action_menu(frame, popup_area, state);
     render_channel_switcher_popup(frame, popup_area, state);
     render_notification_inbox_popup(frame, popup_area, state);
     render_notification_inbox_mark_all_confirmation(frame, popup_area, state);
