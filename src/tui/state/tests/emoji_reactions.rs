@@ -2,6 +2,15 @@ use super::*;
 use crate::discord::AppCommand;
 use crate::discord::test_builders::{ReactionUsersLoadedFixture, reaction_users_loaded_event};
 
+fn select_emoji_reaction_row(state: &mut DashboardState, index: usize) {
+    for _ in 0..20 {
+        state.move_emoji_reaction_up();
+    }
+    for _ in 0..index {
+        state.move_emoji_reaction_down();
+    }
+}
+
 fn push_foreign_reaction_emojis(state: &mut DashboardState) {
     state.push_event(AppEvent::GuildEmojisUpdate {
         guild_id: Id::new(9),
@@ -220,6 +229,124 @@ fn emoji_picker_items_stay_unicode_only_for_direct_messages() {
             .iter()
             .all(|item| matches!(item.emoji, ReactionEmoji::Unicode(_)))
     );
+}
+
+#[test]
+fn emoji_reaction_pin_toggle_adds_and_dedupes() {
+    let mut state = state_with_messages(1);
+    state.open_emoji_reaction_picker();
+
+    // Pin the 3rd quick emoji (😂 Joy), which starts at index 2.
+    select_emoji_reaction_row(&mut state, 2);
+    let target = state.selected_emoji_reaction().expect("row selected").emoji;
+    assert_eq!(target, ReactionEmoji::Unicode("😂".to_owned()));
+    state.toggle_selected_emoji_reaction_pin();
+
+    let items = state.filtered_emoji_reaction_items();
+    assert_eq!(items[0].emoji, target);
+    assert!(items[0].is_pinned);
+    assert_eq!(
+        items.iter().filter(|item| item.emoji == target).count(),
+        1,
+        "a pinned emoji should not be duplicated elsewhere in the list"
+    );
+
+    // Unpin: back to its original spot, no longer pinned, still unique.
+    select_emoji_reaction_row(&mut state, 0);
+    state.toggle_selected_emoji_reaction_pin();
+    let items = state.filtered_emoji_reaction_items();
+    assert!(items.iter().all(|item| !item.is_pinned));
+    assert_eq!(items[2].emoji, target);
+    assert_eq!(items.iter().filter(|item| item.emoji == target).count(), 1);
+}
+
+#[test]
+fn emoji_reaction_pin_hard_overrides_search_ranking() {
+    let guild_id = Id::new(1);
+    let channel_id: Id<ChannelMarker> = Id::new(2);
+    let mut state = DashboardState::new();
+    state.push_event(crate::discord::test_builders::guild_create_event(
+        GuildCreateFixture {
+            channels: vec![text_channel_info(guild_id, channel_id, "general")],
+            emojis: vec![
+                CustomEmojiInfo::test(Id::new(50), "party"),
+                CustomEmojiInfo::test(Id::new(51), "partytime"),
+            ],
+            ..GuildCreateFixture::new(guild_id)
+        },
+    ));
+    state.confirm_selected_guild();
+    state.confirm_selected_channel();
+    state.push_event(message_create_event(guild_text_message(1, "hello")));
+
+    state.open_emoji_reaction_picker();
+    state.start_emoji_reaction_filter();
+    for ch in "party".chars() {
+        state.push_emoji_reaction_filter_char(ch);
+    }
+    // Unpinned: the exact "party" match outranks the looser "partytime".
+    let filtered = state.filtered_emoji_reaction_items();
+    assert_eq!(
+        filtered[0].emoji,
+        ReactionEmoji::Custom {
+            id: Id::new(50),
+            name: Some("party".to_owned()),
+            animated: false,
+        }
+    );
+    state.close_emoji_reaction_picker();
+
+    // Pin "partytime".
+    state.open_emoji_reaction_picker();
+    let row = state
+        .emoji_reaction_items()
+        .iter()
+        .position(
+            |item| matches!(&item.emoji, ReactionEmoji::Custom { id, .. } if *id == Id::new(51)),
+        )
+        .expect("partytime emoji listed");
+    select_emoji_reaction_row(&mut state, row);
+    state.toggle_selected_emoji_reaction_pin();
+
+    state.start_emoji_reaction_filter();
+    for ch in "party".chars() {
+        state.push_emoji_reaction_filter_char(ch);
+    }
+    // Pinned "partytime" now ranks first despite the weaker match.
+    let filtered = state.filtered_emoji_reaction_items();
+    assert_eq!(
+        filtered[0].emoji,
+        ReactionEmoji::Custom {
+            id: Id::new(51),
+            name: Some("partytime".to_owned()),
+            animated: false,
+        }
+    );
+}
+
+#[test]
+fn emoji_reaction_pin_persists_through_ui_state_round_trip() {
+    let mut state = state_with_messages(1);
+    state.open_emoji_reaction_picker();
+    select_emoji_reaction_row(&mut state, 0);
+    let target = state.selected_emoji_reaction().expect("row selected").emoji;
+    state.toggle_selected_emoji_reaction_pin();
+
+    let ui_state = state
+        .take_ui_state_save_request()
+        .expect("pin toggle should request a UI state save");
+    assert_eq!(ui_state.pinned_emojis, vec![target.clone()]);
+
+    let restored = DashboardState::new_with_options(
+        DisplayOptions::default(),
+        Default::default(),
+        Default::default(),
+        NotificationOptions::default(),
+        VoiceOptions::default(),
+        Default::default(),
+        ui_state,
+    );
+    assert!(restored.reactions.pinned_emojis.contains(&target));
 }
 
 #[test]

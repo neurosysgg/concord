@@ -2,7 +2,7 @@ use crate::discord::ids::{
     Id,
     marker::{ChannelMarker, GuildMarker, MessageMarker},
 };
-use crate::discord::{AppCommand, ReactionEmoji};
+use crate::discord::{AppCommand, MessageState, ReactionEmoji};
 use crate::tui::fuzzy::{FuzzyScore, fuzzy_text_score};
 use crate::tui::keybindings::SelectionAction;
 
@@ -75,7 +75,26 @@ impl DashboardState {
 
         items.extend(remaining_unicode_emoji_reaction_items());
 
-        items
+        for item in items.iter_mut() {
+            item.is_pinned = self.reactions.pinned_emojis.contains(&item.emoji);
+        }
+
+        // A pinned emoji only ever shows up once, at the very front, instead
+        // of also sitting wherever it'd normally fall in the catalog.
+        let pinned = self.pinned_emoji_reaction_items(&items);
+        items.retain(|item| !item.is_pinned);
+
+        let mut result = pinned;
+        result.extend(items);
+        result
+    }
+
+    fn pinned_emoji_reaction_items(&self, catalog: &[EmojiReactionItem]) -> Vec<EmojiReactionItem> {
+        self.reactions
+            .pinned_emojis
+            .iter()
+            .filter_map(|emoji| catalog.iter().find(|item| &item.emoji == emoji).cloned())
+            .collect()
     }
 
     pub fn filtered_emoji_reaction_items(&self) -> Vec<EmojiReactionItem> {
@@ -368,21 +387,8 @@ impl DashboardState {
                 .filter(|reaction| reaction.me)
                 .map(|reaction| reaction.emoji.clone())
                 .collect::<Vec<_>>();
-            let items = if self.can_add_new_reaction_for_message(message) {
-                prioritize_existing_reactions(
-                    self.emoji_reaction_items_for_guild(guild_id),
-                    &existing_reactions,
-                )
-            } else {
-                message
-                    .reactions
-                    .iter()
-                    .map(|reaction| EmojiReactionItem {
-                        emoji: reaction.emoji.clone(),
-                        label: reaction.emoji.status_label(),
-                    })
-                    .collect()
-            };
+            let items =
+                self.build_emoji_reaction_picker_items(message, guild_id, &existing_reactions);
             self.popups.modal = Some(ModalPopup::EmojiReactionPicker(EmojiReactionPickerState {
                 selection: Default::default(),
                 filter: None,
@@ -395,6 +401,76 @@ impl DashboardState {
                 channel_id: message.channel_id,
                 message_id: message.id,
             }));
+        }
+    }
+
+    fn build_emoji_reaction_picker_items(
+        &self,
+        message: &MessageState,
+        guild_id: Option<Id<GuildMarker>>,
+        existing_reactions: &[ReactionEmoji],
+    ) -> Vec<EmojiReactionItem> {
+        if self.can_add_new_reaction_for_message(message) {
+            prioritize_existing_reactions(
+                self.emoji_reaction_items_for_guild(guild_id),
+                existing_reactions,
+            )
+        } else {
+            message
+                .reactions
+                .iter()
+                .map(|reaction| EmojiReactionItem {
+                    emoji: reaction.emoji.clone(),
+                    label: reaction.emoji.status_label(),
+                    is_pinned: self.reactions.pinned_emojis.contains(&reaction.emoji),
+                })
+                .collect()
+        }
+    }
+
+    fn toggle_emoji_pin(&mut self, emoji: ReactionEmoji) {
+        let pinned = &mut self.reactions.pinned_emojis;
+        if let Some(position) = pinned.iter().position(|pinned| *pinned == emoji) {
+            pinned.remove(position);
+        } else {
+            pinned.push_front(emoji);
+        }
+        self.options.ui_state_save_pending = true;
+    }
+
+    pub fn toggle_selected_emoji_reaction_pin(&mut self) {
+        let Some(item) = self.selected_emoji_reaction() else {
+            return;
+        };
+        self.toggle_emoji_pin(item.emoji);
+        self.refresh_emoji_reaction_picker_items();
+    }
+
+    fn refresh_emoji_reaction_picker_items(&mut self) {
+        let Some(picker) = self.popups.emoji_reaction_picker().cloned() else {
+            return;
+        };
+        let items = {
+            let Some(message) = self.selected_message_state().filter(|message| {
+                message.channel_id == picker.channel_id && message.id == picker.message_id
+            }) else {
+                return;
+            };
+            self.build_emoji_reaction_picker_items(
+                message,
+                picker.guild_id,
+                &picker.existing_reactions,
+            )
+        };
+        let filtered_items = match picker.filter.as_deref() {
+            Some(filter) if !filter.is_empty() => {
+                filter_emoji_reaction_items_from_slice(&items, filter)
+            }
+            _ => items.clone(),
+        };
+        if let Some(picker) = self.popups.emoji_reaction_picker_mut() {
+            picker.items = items;
+            picker.filtered_items = filtered_items;
         }
     }
 
@@ -433,6 +509,7 @@ fn prioritize_existing_reactions(
             prioritized.push(EmojiReactionItem {
                 emoji: existing.clone(),
                 label: existing.status_label(),
+                is_pinned: false,
             });
         }
     }
@@ -453,12 +530,15 @@ fn filter_emoji_reaction_items_from_slice(
         return items.to_vec();
     }
 
-    let mut scored: Vec<(usize, FuzzyScore, usize, EmojiReactionItem)> = items
+    // Pinned emojis always rank above unpinned ones, regardless of match
+    // quality - same "pinned is always at the top" rule as pinned channels.
+    let mut scored: Vec<(bool, usize, FuzzyScore, usize, EmojiReactionItem)> = items
         .iter()
         .enumerate()
         .filter_map(|(index, item)| {
             emoji_reaction_filter_score(item, filter).map(|score| {
                 (
+                    !item.is_pinned,
                     usize::from(emoji_reaction_is_remaining_unicode(item)),
                     score,
                     index,
@@ -468,10 +548,10 @@ fn filter_emoji_reaction_items_from_slice(
         })
         .collect();
 
-    scored.sort_by_key(|(is_remaining_unicode, score, index, _)| {
-        (*is_remaining_unicode, *score, *index)
+    scored.sort_by_key(|(not_pinned, is_remaining_unicode, score, index, _)| {
+        (*not_pinned, *is_remaining_unicode, *score, *index)
     });
-    scored.into_iter().map(|(_, _, _, item)| item).collect()
+    scored.into_iter().map(|(_, _, _, _, item)| item).collect()
 }
 
 fn emoji_reaction_is_remaining_unicode(item: &EmojiReactionItem) -> bool {

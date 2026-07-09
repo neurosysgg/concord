@@ -2,8 +2,8 @@ use crate::tui::message::syntax_highlight::SyntaxHighlightCache;
 
 use super::{
     ComposerUiState, DiscordUiState, LayoutCacheState, MessageHistoryRefreshState,
-    MessageViewportState, NavigationState, PopupUiState, RequestTrackingState, RuntimeUiState,
-    SettingsState,
+    MessageViewportState, NavigationState, PopupUiState, ReactionsUiState, RequestTrackingState,
+    RuntimeUiState, SettingsState,
 };
 
 #[derive(Debug, Default)]
@@ -18,6 +18,7 @@ pub struct DashboardState {
     pub(super) options: SettingsState,
     pub(super) requests: RequestTrackingState,
     pub(super) layout_cache: LayoutCacheState,
+    pub(super) reactions: ReactionsUiState,
     pub(in crate::tui) syntax_highlight_cache: SyntaxHighlightCache,
 }
 

@@ -1,10 +1,15 @@
 use crate::discord::{CustomEmojiInfo, ReactionEmoji};
 
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 use super::EmojiReactionItem;
 
 const QUICK_UNICODE_EMOJIS: &[&str] = &["👍", "❤️", "😂", "🎉", "😮", "😢", "🙏", "👀"];
+
+#[derive(Debug, Default)]
+pub(super) struct ReactionsUiState {
+    pub(super) pinned_emojis: VecDeque<ReactionEmoji>,
+}
 
 pub(super) fn quick_unicode_emoji_reaction_items() -> Vec<EmojiReactionItem> {
     QUICK_UNICODE_EMOJIS
@@ -35,6 +40,7 @@ fn unicode_emoji_reaction_item_from_emoji(emoji: &emojis::Emoji) -> EmojiReactio
     EmojiReactionItem {
         emoji: ReactionEmoji::Unicode(emoji.as_str().to_owned()),
         label: unicode_emoji_label(emoji),
+        is_pinned: false,
     }
 }
 
@@ -46,6 +52,7 @@ pub(super) fn custom_emoji_reaction_item(emoji: &CustomEmojiInfo) -> EmojiReacti
             animated: emoji.animated,
         },
         label: custom_emoji_label(&emoji.name),
+        is_pinned: false,
     }
 }
 

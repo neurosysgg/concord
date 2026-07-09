@@ -970,6 +970,10 @@ pub(super) fn handle_emoji_reaction_picker_key(
         Some(EmojiReactionPickerAction::ActivateShortcut(shortcut)) => {
             return state.activate_emoji_reaction_shortcut(shortcut);
         }
+        Some(EmojiReactionPickerAction::TogglePin) => {
+            state.toggle_selected_emoji_reaction_pin();
+            return None;
+        }
         None => {}
     }
 

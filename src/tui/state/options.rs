@@ -155,6 +155,7 @@ impl DashboardState {
         self.navigation.channels.established_dms = options.established_dms.into_iter().collect();
         self.navigation.channels.pinned_channel_ids =
             options.pinned_channel_ids.into_iter().collect();
+        self.reactions.pinned_emojis = options.pinned_emojis.into_iter().collect();
         self.navigation.guilds.collapsed_folders = options
             .collapsed_server_folder_ids
             .into_iter()
@@ -211,6 +212,7 @@ impl DashboardState {
             .iter()
             .copied()
             .collect();
+        let pinned_emojis: Vec<_> = self.reactions.pinned_emojis.iter().cloned().collect();
 
         UiStateOptions {
             guild_pane_visible: self.navigation.guilds.visible,
@@ -224,6 +226,7 @@ impl DashboardState {
             collapsed_server_folder_guilds,
             established_dms,
             pinned_channel_ids,
+            pinned_emojis,
         }
     }
 

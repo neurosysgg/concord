@@ -231,6 +231,8 @@ Concord renders a practical subset of Discord-style Markdown in message bodies:
 ### Reactions & Polls
 
 - View, add, and remove emoji reactions (Unicode and custom server emoji)
+- Pin emoji for quick access in the reaction picker (`Alt+e`); pinned emoji always rank first
+  in search and only ever show up once
 - Use custom emoji from other servers as reactions when your account supports it
 - Browse who reacted with a specific emoji
 - View and vote on polls
@@ -308,6 +310,7 @@ With default vim-style navigation:
 | `Ctrl+d` / `Ctrl+u`                       | Half-page scroll                                |
 | `Alt+h/l/←/→`                             | Resize focused pane width                       |
 | `Alt+p`                                   | Pin/unpin the active channel, or the highlighted channel switcher row |
+| `Alt+e`                                   | Pin/unpin the highlighted emoji in the reaction picker |
 | `gg` / `G`                                | Jump or scroll to top / bottom                  |
 | `Enter`                                   | Open or activate the selected item              |
 | `/`                                       | Filter Guilds/Channels, search Messages/Members |

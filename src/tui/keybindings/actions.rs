@@ -111,6 +111,7 @@ define_ui_actions! {
     OpenOptions => ("Options", &[&[Leader, Char('o')]], None),
     ChannelSwitcher => ("Switch channels", &[&[Leader, Leader]], None),
     ToggleChannelPin => ("toggle pinned channel", &[&[ModifiedKey(KeyCode::Char('p'), KeyModifiers::ALT)]], None),
+    ToggleEmojiPin => ("toggle pinned emoji", &[&[ModifiedKey(KeyCode::Char('e'), KeyModifiers::ALT)]], None),
     OpenNotificationInbox => ("Notification inbox", &[&[Leader, Char('n')]], None),
     OpenDisplayOptions => ("Display options", &[], None),
     OpenComposerOptions => ("Composer options", &[], None),
@@ -332,6 +333,7 @@ pub(in crate::tui) enum EmojiReactionPickerAction {
     InsertFilterChar(char),
     ActivateSelected,
     ActivateShortcut(char),
+    TogglePin,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -407,6 +407,13 @@ impl KeyBindings {
         if close_key {
             return Some(EmojiReactionPickerAction::Close);
         }
+        if self
+            .keymap_single_key_shortcuts(UiAction::ToggleEmojiPin)
+            .iter()
+            .any(|shortcut| shortcut.matches(key))
+        {
+            return Some(EmojiReactionPickerAction::TogglePin);
+        }
 
         match key.code {
             KeyCode::Enter if filter_editing => Some(EmojiReactionPickerAction::CommitFilter),

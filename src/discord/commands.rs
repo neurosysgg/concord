@@ -197,7 +197,7 @@ impl MessageAttachmentUpload {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum ReactionEmoji {
     Unicode(String),
     Custom {

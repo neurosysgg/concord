@@ -165,6 +165,54 @@ fn channel_switcher_toggle_pin_is_remappable() {
 }
 
 #[test]
+fn emoji_reaction_picker_toggle_pin_uses_alt_e_and_leaves_typing_intact() {
+    let key_bindings = KeyBindings::default();
+
+    let toggle = KeyEvent::new(KeyCode::Char('e'), KeyModifiers::ALT);
+    assert_eq!(
+        key_bindings.emoji_reaction_picker_action(toggle, false),
+        Some(EmojiReactionPickerAction::TogglePin)
+    );
+    assert_eq!(
+        key_bindings.emoji_reaction_picker_action(toggle, true),
+        Some(EmojiReactionPickerAction::TogglePin)
+    );
+
+    let typed = KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE);
+    assert_eq!(
+        key_bindings.emoji_reaction_picker_action(typed, false),
+        Some(EmojiReactionPickerAction::ActivateShortcut('e'))
+    );
+    assert_eq!(
+        key_bindings.emoji_reaction_picker_action(typed, true),
+        Some(EmojiReactionPickerAction::InsertFilterChar('e'))
+    );
+}
+
+#[test]
+fn emoji_reaction_picker_toggle_pin_is_remappable() {
+    let keymap = KeymapOptions {
+        mappings: [("ToggleEmojiPin".to_owned(), KeymapBinding::one("<C-y>"))]
+            .into_iter()
+            .collect(),
+        ..KeymapOptions::default()
+    };
+    let key_bindings = KeyBindings::from_options(&keymap);
+
+    let old_default = KeyEvent::new(KeyCode::Char('e'), KeyModifiers::ALT);
+    assert_eq!(
+        key_bindings.emoji_reaction_picker_action(old_default, false),
+        None
+    );
+
+    let remapped = KeyEvent::new(KeyCode::Char('y'), KeyModifiers::CONTROL);
+    assert_eq!(
+        key_bindings.emoji_reaction_picker_action(remapped, false),
+        Some(EmojiReactionPickerAction::TogglePin)
+    );
+}
+
+#[test]
 fn default_keymap_uses_leader_v_voice_group() {
     let key_bindings = KeyBindings::default();
     let mut prefix = key_bindings.leader_keymap_prefix();

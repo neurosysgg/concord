@@ -606,7 +606,7 @@ fn emoji_reaction_picker_lines_with_custom_emoji_images(
                 && reaction
                     .custom_image_url()
                     .is_some_and(|url| options.thumbnail_urls.iter().any(|ready| ready == &url));
-            Line::from(vec![
+            let mut spans = vec![
                 Span::styled(marker, Style::default().fg(theme::current().accent)),
                 Span::styled(shortcut, Style::default().fg(theme::current().dim)),
                 Span::styled(
@@ -617,7 +617,14 @@ fn emoji_reaction_picker_lines_with_custom_emoji_images(
                     ),
                     style,
                 ),
-            ])
+            ];
+            if reaction.is_pinned {
+                spans.push(Span::styled(
+                    " 📌",
+                    Style::default().fg(theme::current().accent),
+                ));
+            }
+            Line::from(spans)
         })
         .collect();
 

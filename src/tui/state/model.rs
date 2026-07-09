@@ -513,6 +513,7 @@ impl ChannelThreadItem {
 pub struct EmojiReactionItem {
     pub emoji: ReactionEmoji,
     pub label: String,
+    pub is_pinned: bool,
 }
 
 impl EmojiReactionItem {
@@ -528,6 +529,7 @@ impl EmojiReactionItem {
         Self {
             emoji,
             label: String::new(),
+            is_pinned: false,
         }
     }
 }

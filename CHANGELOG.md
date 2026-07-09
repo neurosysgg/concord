@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Pin channels for quick access in the fuzzy channel switcher, with a "Pinned Channels" group that always ranks first in search, and a global `Alt+p` shortcut to pin/unpin whichever channel you're currently viewing
 - A pinned channel now shows up exactly once (in "Pinned Channels"), instead of being duplicated in "Recent Channels" or its normal guild/DM listing
 - Unread pinned channels sort to the top of the "Pinned Channels" group, ahead of read ones
+- Pin emoji reactions for quick access in the reaction picker with `Alt+e`: pinned emoji always rank first (including during search), and only ever show up once instead of being duplicated in the catalog or the existing-reactions list
 
 ## [2.3.2] - 2026-07-08
 

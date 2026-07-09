@@ -38,6 +38,7 @@ mod voice_actions;
 
 use composer::ComposerUiState;
 use discord_ui::DiscordUiState;
+use emoji::ReactionsUiState;
 use layout_cache::{LayoutCacheState, MessageRowContentMetrics, MessageRowContentMetricsCacheKey};
 use message_history_refresh::MessageHistoryRefreshState;
 use message_render::{add_literal_mention_highlights, normalize_text_highlights};

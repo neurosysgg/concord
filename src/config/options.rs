@@ -6,7 +6,7 @@ use crate::discord::ids::{
     Id,
     marker::{ChannelMarker, GuildMarker},
 };
-use crate::discord::{MicrophoneSensitivityDb, VoiceVolumePercent};
+use crate::discord::{MicrophoneSensitivityDb, ReactionEmoji, VoiceVolumePercent};
 
 pub const DEFAULT_SERVER_WIDTH: u16 = 20;
 pub const DEFAULT_CHANNEL_LIST_WIDTH: u16 = 24;
@@ -275,6 +275,9 @@ pub struct UiStateOptions {
     /// Channels pinned for quick access in the channel switcher, most
     /// recently pinned first.
     pub pinned_channel_ids: Vec<Id<ChannelMarker>>,
+    /// Emoji reactions pinned for quick access in the reaction picker, most
+    /// recently pinned first.
+    pub pinned_emojis: Vec<ReactionEmoji>,
 }
 
 impl Default for UiStateOptions {
@@ -291,6 +294,7 @@ impl Default for UiStateOptions {
             collapsed_server_folder_guilds: Vec::new(),
             established_dms: Vec::new(),
             pinned_channel_ids: Vec::new(),
+            pinned_emojis: Vec::new(),
         }
     }
 }
