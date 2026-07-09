@@ -81,7 +81,7 @@ pub use message::{
     AttachmentInfo, AttachmentMediaType, AttachmentUpdate, EmbedFieldInfo, EmbedInfo,
     InlinePreviewInfo, MESSAGE_FLAG_SUPPRESS_EMBEDS, MentionInfo, MessageInfo,
     MessageInteractionInfo, MessageKind, MessageReferenceInfo, MessageSnapshotInfo, PollAnswerInfo,
-    PollInfo, ReactionInfo, ReactionUserInfo, ReplyInfo,
+    PollInfo, ReactionInfo, ReactionUserInfo, ReplyInfo, StickerFormatType, StickerItemInfo,
 };
 pub use notification::{
     ChannelNotificationOverrideInfo, GuildNotificationSettingsInfo, NotificationLevel,

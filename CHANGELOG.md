@@ -10,6 +10,12 @@ All notable changes to this project will be documented in this file.
 - A pinned channel now shows up exactly once (in "Pinned Channels"), instead of being duplicated in "Recent Channels" or its normal guild/DM listing
 - Unread pinned channels sort to the top of the "Pinned Channels" group, ahead of read ones
 - Pin emoji reactions for quick access in the reaction picker with `Alt+e`: pinned emoji always rank first (including during search), and only ever show up once instead of being duplicated in the catalog or the existing-reactions list
+- Parse real sticker data (id, name, format type) from `sticker_items` instead of names only, exposed as `StickerItemInfo`/`StickerFormatType` on messages, snapshots, and replies
+- Render PNG/APNG/GIF stickers as real inline images, proportionally sized through the same pipeline attachments and embeds use; Lottie-format stickers (no bitmap CDN asset) still fall back to `[Sticker: name]` text
+
+### Known Issues
+
+- Scrolling a channel with rendered images (attachments, embeds, or stickers) can cause visible redraw flicker. Predates the sticker work - stickers just made it easier to trigger by adding another inline-image source. Not yet root-caused; suspected to be in the general image-preview redraw/scroll path rather than anything sticker-specific.
 
 ## [2.3.2] - 2026-07-08
 

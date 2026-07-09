@@ -436,6 +436,47 @@ fn message_capabilities_expose_action_facets_for_chat_messages_only() {
 }
 
 #[test]
+fn message_capabilities_and_inline_previews_include_renderable_stickers() {
+    let mut message = message_state("hello");
+    message.stickers = vec![StickerItemInfo::test(Id::new(70), "Wave")];
+
+    let capabilities = message.capabilities();
+    assert!(capabilities.has_image);
+
+    let previews = message.inline_previews();
+    assert_eq!(previews.len(), 1);
+    assert_eq!(
+        previews[0].url,
+        "https://cdn.discordapp.com/stickers/70.png"
+    );
+    assert_eq!(previews[0].filename, "Wave");
+    assert_eq!(previews[0].width, Some(320));
+    assert_eq!(previews[0].height, Some(320));
+}
+
+#[test]
+fn lottie_stickers_have_no_inline_preview_or_image_capability() {
+    let mut message = message_state("hello");
+    message.stickers = vec![StickerItemInfo::new(
+        Id::new(71),
+        "Vector".to_owned(),
+        StickerFormatType::Lottie,
+    )];
+
+    assert!(message.inline_previews().is_empty());
+    assert!(!message.capabilities().has_image);
+}
+
+#[test]
+fn inline_previews_include_attachments_embeds_and_stickers_together() {
+    let mut message = message_state("hello");
+    message.attachments = vec![attachment_info(1, "cat.png", "image/png")];
+    message.stickers = vec![StickerItemInfo::test(Id::new(70), "Wave")];
+
+    assert_eq!(message.inline_previews().len(), 2);
+}
+
+#[test]
 fn message_capabilities_track_reply_and_forwarded_traits() {
     let mut message = message_state("reply body");
     message.reply = Some(ReplyInfo {

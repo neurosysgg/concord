@@ -7,7 +7,7 @@ use crate::discord::ids::{
 use crate::discord::{
     AttachmentInfo, AttachmentMediaType, EmbedInfo, InlinePreviewInfo, MemberInfo, MentionInfo,
     MessageInfo, MessageInteractionInfo, MessageKind, MessageReferenceInfo, MessageSnapshotInfo,
-    MessageUpdateEventFields, PollInfo, ReactionEmoji, ReactionInfo, ReplyInfo,
+    MessageUpdateEventFields, PollInfo, ReactionEmoji, ReactionInfo, ReplyInfo, StickerItemInfo,
 };
 use crate::discord::{
     member::{selected_member_role_color, selected_role_ids_color},
@@ -32,7 +32,7 @@ pub struct MessageState {
     pub pinned: bool,
     pub reactions: Vec<ReactionInfo>,
     pub content: Option<String>,
-    pub sticker_names: Vec<String>,
+    pub stickers: Vec<StickerItemInfo>,
     pub mentions: Vec<MentionInfo>,
     pub mention_everyone: bool,
     pub mention_roles: Vec<Id<RoleMarker>>,
@@ -61,7 +61,7 @@ impl Default for MessageState {
             pinned: false,
             reactions: Vec::new(),
             content: None,
-            sticker_names: Vec::new(),
+            stickers: Vec::new(),
             mentions: Vec::new(),
             mention_everyone: false,
             mention_roles: Vec::new(),
@@ -91,7 +91,7 @@ impl MessageState {
         self.reply = None;
         self.poll = None;
         self.content = None;
-        self.sticker_names.clear();
+        self.stickers.clear();
         self.mentions.clear();
         self.attachments.clear();
         self.embeds.clear();
@@ -104,6 +104,14 @@ impl MessageState {
             self.forwarded_snapshots
                 .iter()
                 .flat_map(|snapshot| snapshot.attachments.iter()),
+        )
+    }
+
+    pub fn stickers_in_display_order(&self) -> impl Iterator<Item = &StickerItemInfo> {
+        self.stickers.iter().chain(
+            self.forwarded_snapshots
+                .iter()
+                .flat_map(|snapshot| snapshot.stickers.iter()),
         )
     }
 
@@ -120,6 +128,10 @@ impl MessageState {
                     )
                     .find_map(EmbedInfo::inline_preview_info)
             })
+            .or_else(|| {
+                self.stickers_in_display_order()
+                    .find_map(StickerItemInfo::inline_preview_info)
+            })
     }
 
     pub fn inline_previews(&self) -> Vec<InlinePreviewInfo<'_>> {
@@ -134,6 +146,10 @@ impl MessageState {
                             .flat_map(|snapshot| snapshot.embeds.iter()),
                     )
                     .filter_map(EmbedInfo::inline_preview_info),
+            )
+            .chain(
+                self.stickers_in_display_order()
+                    .filter_map(StickerItemInfo::inline_preview_info),
             )
             .collect()
     }
@@ -1050,7 +1066,7 @@ impl DiscordState {
             pinned: message.pinned,
             reactions: message.reactions.clone(),
             content: message.content.clone(),
-            sticker_names: message.sticker_names.clone(),
+            stickers: message.stickers.clone(),
             mentions: message.mentions.clone(),
             mention_everyone: message.mention_everyone,
             mention_roles: message.mention_roles.clone(),
@@ -1230,8 +1246,8 @@ fn merge_message(existing: &mut MessageState, incoming: &MessageState) {
             existing.content = Some(content.clone());
         }
     }
-    if !incoming.sticker_names.is_empty() || existing.sticker_names.is_empty() {
-        existing.sticker_names = incoming.sticker_names.clone();
+    if !incoming.stickers.is_empty() || existing.stickers.is_empty() {
+        existing.stickers = incoming.stickers.clone();
     }
     existing.mentions = merge_message_mentions(&existing.mentions, &incoming.mentions);
     existing.mention_everyone = incoming.mention_everyone;
@@ -1315,8 +1331,8 @@ fn update_message_in(
         if let Some(content) = &update.body.content {
             existing.content = Some(content.clone());
         }
-        if let Some(sticker_names) = &update.body.sticker_names {
-            existing.sticker_names = sticker_names.clone();
+        if let Some(stickers) = &update.body.stickers {
+            existing.stickers = stickers.clone();
         }
         if let Some(mentions) = &update.body.mentions {
             existing.mentions = mentions.clone();

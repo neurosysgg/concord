@@ -29,7 +29,8 @@ use crate::discord::{
     MessageUpdateDispatchInfo, MessageUpdateEventFields, NotificationLevel,
     PermissionOverwriteInfo, PermissionOverwriteKind, PollAnswerInfo, PollInfo, PremiumTier,
     PresenceStatus, ReactionEmoji, ReactionInfo, ReadStateInfo, RelationshipInfo, ReplyInfo,
-    RoleInfo, UserGuildSettingsInfo, UserProfileInfo, VoiceStateInfo,
+    RoleInfo, StickerFormatType, StickerItemInfo, UserGuildSettingsInfo, UserProfileInfo,
+    VoiceStateInfo,
 };
 
 mod channels;

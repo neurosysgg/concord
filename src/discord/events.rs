@@ -16,8 +16,8 @@ use super::{
     ActivityInfo, AttachmentUpdate, ChannelInfo, CustomEmojiInfo, EmbedInfo, GuildBoostTier,
     GuildNotificationSettingsInfo, MemberInfo, MentionInfo, MessageInfo, PollInfo, PremiumTier,
     PresenceStatus, ReactionUserInfo, ReadStateInfo, RelationshipInfo, RoleInfo, SnapshotAreas,
-    UserProfileInfo, UserSettingsInfo, VoiceConnectionStatus, VoiceScope, VoiceServerInfo,
-    VoiceSoundKind, VoiceStateInfo, is_thread_kind,
+    StickerItemInfo, UserProfileInfo, UserSettingsInfo, VoiceConnectionStatus, VoiceScope,
+    VoiceServerInfo, VoiceSoundKind, VoiceStateInfo, is_thread_kind,
 };
 
 #[cfg(test)]
@@ -33,7 +33,7 @@ pub struct GatewayDispatchInfo {
 pub struct MessageUpdateEventFields {
     pub poll: Option<PollInfo>,
     pub content: Option<String>,
-    pub sticker_names: Option<Vec<String>>,
+    pub stickers: Option<Vec<StickerItemInfo>>,
     pub mentions: Option<Vec<MentionInfo>>,
     pub mention_everyone: Option<bool>,
     pub mention_roles: Option<Vec<Id<RoleMarker>>>,
@@ -57,7 +57,7 @@ impl Default for MessageUpdateEventFields {
         Self {
             poll: None,
             content: None,
-            sticker_names: None,
+            stickers: None,
             mentions: None,
             mention_everyone: None,
             mention_roles: None,

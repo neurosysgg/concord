@@ -6,7 +6,10 @@ pub use state::{MessageCapabilities, MessageState};
 use crate::discord::commands::ReactionEmoji;
 use crate::discord::ids::{
     Id,
-    marker::{AttachmentMarker, ChannelMarker, GuildMarker, MessageMarker, RoleMarker, UserMarker},
+    marker::{
+        AttachmentMarker, ChannelMarker, GuildMarker, MessageMarker, RoleMarker, StickerMarker,
+        UserMarker,
+    },
 };
 
 pub const MESSAGE_FLAG_SUPPRESS_EMBEDS: u64 = 1 << 2;
@@ -52,6 +55,101 @@ pub enum AttachmentMediaType {
     Image,
     Video,
     Audio,
+}
+
+/// Standard/guild sticker assets are always published at this resolution, so
+/// it's used as the assumed source size for inline-preview scaling: message
+/// payloads only carry `sticker_items` (id/name/format_type), never real
+/// per-sticker dimensions.
+pub const STICKER_IMAGE_SIZE: u64 = 320;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StickerItemInfo {
+    pub id: Id<StickerMarker>,
+    pub name: String,
+    pub format_type: StickerFormatType,
+    /// CDN URL for the sticker's bitmap, or `None` for formats with no
+    /// raster representation (Lottie).
+    pub image_url: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StickerFormatType {
+    Png,
+    Apng,
+    /// Vector animation (Lottie/dotLottie) with no bitmap CDN URL: there is no
+    /// renderer for this format here, so these fall back to name-only display.
+    Lottie,
+    Gif,
+    Unknown(u8),
+}
+
+impl StickerFormatType {
+    pub fn new(value: u8) -> Self {
+        match value {
+            1 => Self::Png,
+            2 => Self::Apng,
+            3 => Self::Lottie,
+            4 => Self::Gif,
+            other => Self::Unknown(other),
+        }
+    }
+
+    /// Whether concord can render this as a static or animated raster image.
+    pub fn is_renderable(self) -> bool {
+        matches!(self, Self::Png | Self::Apng | Self::Gif)
+    }
+}
+
+fn sticker_cdn_image_url(id: Id<StickerMarker>, format_type: StickerFormatType) -> Option<String> {
+    if !format_type.is_renderable() {
+        return None;
+    }
+    let extension = match format_type {
+        StickerFormatType::Gif => "gif",
+        _ => "png",
+    };
+    Some(format!(
+        "https://cdn.discordapp.com/stickers/{}.{}",
+        id.get(),
+        extension
+    ))
+}
+
+impl StickerItemInfo {
+    pub fn new(id: Id<StickerMarker>, name: String, format_type: StickerFormatType) -> Self {
+        Self {
+            image_url: sticker_cdn_image_url(id, format_type),
+            id,
+            name,
+            format_type,
+        }
+    }
+
+    /// Inline-preview projection for the shared attachment/embed image
+    /// pipeline, using the standard sticker resolution as the assumed
+    /// source size so real proportional scaling still applies. `None` for
+    /// non-renderable formats (Lottie).
+    pub fn inline_preview_info(&self) -> Option<InlinePreviewInfo<'_>> {
+        Some(InlinePreviewInfo {
+            url: self.image_url.as_deref()?,
+            proxy_url: None,
+            filename: self.name.as_str(),
+            width: Some(STICKER_IMAGE_SIZE),
+            height: Some(STICKER_IMAGE_SIZE),
+            accent_color: None,
+            proxy_preview_only: false,
+            show_play_marker: false,
+        })
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+impl StickerItemInfo {
+    pub(crate) fn test(id: Id<StickerMarker>, name: impl Into<String>) -> Self {
+        Self::new(id, name.into(), StickerFormatType::Png)
+    }
 }
 
 #[cfg(test)]
@@ -225,7 +323,7 @@ impl Default for MessageKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MessageSnapshotInfo {
     pub content: Option<String>,
-    pub sticker_names: Vec<String>,
+    pub stickers: Vec<StickerItemInfo>,
     pub mentions: Vec<MentionInfo>,
     pub attachments: Vec<AttachmentInfo>,
     pub embeds: Vec<EmbedInfo>,
@@ -239,7 +337,7 @@ impl MessageSnapshotInfo {
     pub(crate) fn test() -> Self {
         Self {
             content: None,
-            sticker_names: Vec::new(),
+            stickers: Vec::new(),
             mentions: Vec::new(),
             attachments: Vec::new(),
             embeds: Vec::new(),
@@ -254,7 +352,7 @@ pub struct ReplyInfo {
     pub author_id: Option<Id<UserMarker>>,
     pub author: String,
     pub content: Option<String>,
-    pub sticker_names: Vec<String>,
+    pub stickers: Vec<StickerItemInfo>,
     pub mentions: Vec<MentionInfo>,
 }
 
@@ -266,7 +364,7 @@ impl ReplyInfo {
             author_id: None,
             author: author.into(),
             content: None,
-            sticker_names: Vec::new(),
+            stickers: Vec::new(),
             mentions: Vec::new(),
         }
     }
@@ -408,7 +506,7 @@ pub struct MessageInfo {
     pub pinned: bool,
     pub reactions: Vec<ReactionInfo>,
     pub content: Option<String>,
-    pub sticker_names: Vec<String>,
+    pub stickers: Vec<StickerItemInfo>,
     pub mentions: Vec<MentionInfo>,
     pub mention_everyone: bool,
     pub mention_roles: Vec<Id<RoleMarker>>,
@@ -438,7 +536,7 @@ impl Default for MessageInfo {
             pinned: false,
             reactions: Vec::new(),
             content: None,
-            sticker_names: Vec::new(),
+            stickers: Vec::new(),
             mentions: Vec::new(),
             mention_everyone: false,
             mention_roles: Vec::new(),

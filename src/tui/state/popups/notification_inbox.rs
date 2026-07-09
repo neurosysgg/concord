@@ -558,8 +558,14 @@ impl DashboardState {
                 .collect::<Vec<_>>()
                 .join(" "),
             None if !message.attachments.is_empty() => "[attachment]".to_owned(),
-            None if !message.sticker_names.is_empty() => {
-                format!("[sticker] {}", message.sticker_names.join(", "))
+            None if !message.stickers.is_empty() => {
+                let names = message
+                    .stickers
+                    .iter()
+                    .map(|sticker| sticker.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("[sticker] {names}")
             }
             None if !message.embeds.is_empty() => "[embed]".to_owned(),
             None => "<empty message>".to_owned(),

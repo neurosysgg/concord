@@ -210,7 +210,10 @@ choose `[o] sign out`.
 - Use custom emoji from other servers when your account supports it
 - Send custom emoji your account cannot use directly as image links when enabled
 - View full message history
-- Rich content display (embeds, attachments, stickers, and mentions)
+- Rich content display (embeds, attachments, and mentions)
+- Stickers render as real inline images (PNG/APNG/GIF), sized proportionally like attachments;
+  Lottie-format stickers (vector animation) fall back to a `[Sticker: name]` text label since
+  there's no renderer for that format here
 - Detect URLs in message bodies and markdown links, then open them in your default browser
 - Direct message shortcuts for copy, reply, edit, delete, reactions, URL opening,
   and image viewing. More message actions are available from the action menu.

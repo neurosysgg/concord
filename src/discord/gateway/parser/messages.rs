@@ -5,14 +5,14 @@ use crate::{
         AttachmentInfo, AttachmentUpdate, EmbedFieldInfo, EmbedInfo, MentionInfo, MessageInfo,
         MessageInteractionInfo, MessageKind, MessageReferenceInfo, MessageSnapshotInfo,
         MessageUpdateDispatchInfo, PollAnswerInfo, PollInfo, ReactionEmoji, ReactionInfo,
-        ReplyInfo,
+        ReplyInfo, StickerFormatType, StickerItemInfo,
         avatar::user_avatar_url,
         events::AppEvent,
         ids::{
             Id,
             marker::{
                 AttachmentMarker, ChannelMarker, EmojiMarker, GuildMarker, MessageMarker,
-                RoleMarker, UserMarker,
+                RoleMarker, StickerMarker, UserMarker,
             },
         },
     },
@@ -44,7 +44,7 @@ pub(crate) fn parse_message_info(data: &Value) -> Option<MessageInfo> {
         .and_then(Value::as_str)
         .map(str::to_owned);
     let interaction = parse_message_interaction_info(data);
-    let sticker_names = parse_sticker_names(data.get("sticker_items"));
+    let stickers = parse_sticker_items(data.get("sticker_items"));
     let mentions = parse_mentions(data.get("mentions"));
     let mention_everyone = data
         .get("mention_everyone")
@@ -88,7 +88,7 @@ pub(crate) fn parse_message_info(data: &Value) -> Option<MessageInfo> {
         pinned: data.get("pinned").and_then(Value::as_bool).unwrap_or(false),
         reactions: parse_reactions(data.get("reactions")),
         content,
-        sticker_names,
+        stickers,
         mentions,
         mention_everyone,
         mention_roles,
@@ -148,16 +148,23 @@ pub(super) fn parse_attachments(value: Option<&Value>) -> Vec<AttachmentInfo> {
         .unwrap_or_default()
 }
 
-pub(super) fn parse_sticker_names(value: Option<&Value>) -> Vec<String> {
+pub(super) fn parse_sticker_items(value: Option<&Value>) -> Vec<StickerItemInfo> {
     value
         .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.get("name").and_then(Value::as_str).map(str::to_owned))
-                .collect()
-        })
+        .map(|items| items.iter().filter_map(parse_sticker_item).collect())
         .unwrap_or_default()
+}
+
+fn parse_sticker_item(value: &Value) -> Option<StickerItemInfo> {
+    let id = parse_id::<StickerMarker>(value.get("id")?)?;
+    let name = value.get("name")?.as_str()?.to_owned();
+    let format_type = value
+        .get("format_type")
+        .and_then(Value::as_u64)
+        .and_then(|value| u8::try_from(value).ok())
+        .map(StickerFormatType::new)
+        .unwrap_or(StickerFormatType::Unknown(0));
+    Some(StickerItemInfo::new(id, name, format_type))
 }
 
 pub(super) fn parse_embeds(value: Option<&Value>) -> Vec<EmbedInfo> {
@@ -306,14 +313,14 @@ fn parse_reply_info(value: &Value) -> Option<ReplyInfo> {
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
         .map(str::to_owned);
-    let sticker_names = parse_sticker_names(value.get("sticker_items"));
+    let stickers = parse_sticker_items(value.get("sticker_items"));
     let mentions = parse_mentions(value.get("mentions"));
 
     Some(ReplyInfo {
         author_id,
         author: author_name,
         content,
-        sticker_names,
+        stickers,
         mentions,
     })
 }
@@ -573,7 +580,7 @@ fn parse_message_snapshot(
         .get("content")
         .and_then(Value::as_str)
         .map(str::to_owned);
-    let sticker_names = parse_sticker_names(message.get("sticker_items"));
+    let stickers = parse_sticker_items(message.get("sticker_items"));
     let attachments = parse_attachments(message.get("attachments"));
     let embeds = parse_embeds(message.get("embeds"));
     let mentions = parse_mentions(message.get("mentions"));
@@ -583,7 +590,7 @@ fn parse_message_snapshot(
         .map(str::to_owned);
 
     if content.as_deref().is_some_and(|value| !value.is_empty())
-        || !sticker_names.is_empty()
+        || !stickers.is_empty()
         || !attachments.is_empty()
         || !embeds.is_empty()
         || source_channel_id.is_some()
@@ -591,7 +598,7 @@ fn parse_message_snapshot(
     {
         Some(MessageSnapshotInfo {
             content,
-            sticker_names,
+            stickers,
             mentions,
             attachments,
             embeds,
@@ -650,9 +657,9 @@ pub(super) fn parse_message_update(data: &Value) -> Option<AppEvent> {
         .get("content")
         .and_then(Value::as_str)
         .map(str::to_owned);
-    let sticker_names = data
+    let stickers = data
         .get("sticker_items")
-        .map(|value| parse_sticker_names(Some(value)));
+        .map(|value| parse_sticker_items(Some(value)));
     let attachments = if data.get("attachments").is_some() {
         AttachmentUpdate::Replace(parse_attachments(data.get("attachments")))
     } else {
@@ -683,7 +690,7 @@ pub(super) fn parse_message_update(data: &Value) -> Option<AppEvent> {
             fields: crate::discord::MessageUpdateEventFields {
                 poll,
                 content,
-                sticker_names,
+                stickers,
                 mentions,
                 mention_everyone,
                 mention_roles,
