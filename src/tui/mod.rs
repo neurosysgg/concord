@@ -13,6 +13,7 @@ mod terminal;
 mod text;
 mod text_cursor;
 mod text_input;
+mod theme;
 mod ui;
 
 use tokio::sync::{mpsc, watch};
