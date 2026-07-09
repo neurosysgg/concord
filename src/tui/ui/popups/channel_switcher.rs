@@ -262,6 +262,12 @@ fn channel_switcher_item_line(item: &ChannelSwitcherItem, selected: bool) -> Lin
     if let Some(badge) = badge {
         spans.push(badge);
     }
+    if item.is_pinned {
+        spans.push(Span::styled(
+            "📌 ",
+            Style::default().fg(theme::current().accent),
+        ));
+    }
     spans.push(Span::styled(item.channel_label.clone(), name_style));
     Line::from(spans)
 }

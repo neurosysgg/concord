@@ -153,6 +153,8 @@ impl DashboardState {
         self.navigation.channels.collapsed_channel_categories =
             options.collapsed_channel_categories.into_iter().collect();
         self.navigation.channels.established_dms = options.established_dms.into_iter().collect();
+        self.navigation.channels.pinned_channel_ids =
+            options.pinned_channel_ids.into_iter().collect();
         self.navigation.guilds.collapsed_folders = options
             .collapsed_server_folder_ids
             .into_iter()
@@ -200,6 +202,16 @@ impl DashboardState {
                 .cmp(right.iter().map(|id| id.get()))
         });
 
+        // Pin order is meaningful (most recently pinned first), unlike the
+        // other id sets above, so it's carried over as-is rather than sorted.
+        let pinned_channel_ids: Vec<_> = self
+            .navigation
+            .channels
+            .pinned_channel_ids
+            .iter()
+            .copied()
+            .collect();
+
         UiStateOptions {
             guild_pane_visible: self.navigation.guilds.visible,
             channel_pane_visible: self.navigation.channels.visible,
@@ -211,6 +223,7 @@ impl DashboardState {
             collapsed_server_folder_ids,
             collapsed_server_folder_guilds,
             established_dms,
+            pinned_channel_ids,
         }
     }
 

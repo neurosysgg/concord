@@ -467,6 +467,10 @@ pub(super) fn handle_channel_switcher_key(
         Some(ChannelSwitcherAction::ActivateSelected) => {
             state.activate_selected_channel_switcher_item()
         }
+        Some(ChannelSwitcherAction::TogglePin) => {
+            state.toggle_selected_channel_switcher_pin();
+            None
+        }
         Some(ChannelSwitcherAction::MoveQueryCursorLeft) => {
             state.move_channel_switcher_query_cursor_left();
             None

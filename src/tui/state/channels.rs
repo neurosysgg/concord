@@ -1014,6 +1014,23 @@ impl DashboardState {
         )
     }
 
+    pub(super) fn toggle_channel_pin(&mut self, channel_id: Id<ChannelMarker>) {
+        let pinned = &mut self.navigation.channels.pinned_channel_ids;
+        if let Some(position) = pinned.iter().position(|id| *id == channel_id) {
+            pinned.remove(position);
+        } else {
+            pinned.push_front(channel_id);
+        }
+        self.options.ui_state_save_pending = true;
+    }
+
+    pub fn toggle_active_channel_pin(&mut self) {
+        let Some(channel_id) = self.navigation.channels.active_channel_id else {
+            return;
+        };
+        self.toggle_channel_pin(channel_id);
+    }
+
     pub fn toggle_selected_channel_category(&mut self) {
         let Some(category_id) = self.selected_channel_category_id() else {
             return;

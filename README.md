@@ -191,6 +191,8 @@ choose `[o] sign out`.
 - View, filter, and create forum/media posts (active / archived)
 - Create, edit, follow, close, lock, pin, and delete threads and forum posts
 - Switch channels, threads, and posts with the fuzzy channel switcher (`Space`, `Space`)
+- Pin channels for quick access in the fuzzy channel switcher, or pin the channel you're
+  currently viewing directly (`Alt+p`); pinned channels always rank first in switcher search
 - Load pinned messages per channel
 - Open channel actions for pinned messages, thread lists, and mark-as-read
 - Join and leave voice channels/DM calls
@@ -305,6 +307,7 @@ With default vim-style navigation:
 | `J`, `K` / `H`, `L`                       | Scroll viewport                                 |
 | `Ctrl+d` / `Ctrl+u`                       | Half-page scroll                                |
 | `Alt+h/l/←/→`                             | Resize focused pane width                       |
+| `Alt+p`                                   | Pin/unpin the active channel, or the highlighted channel switcher row |
 | `gg` / `G`                                | Jump or scroll to top / bottom                  |
 | `Enter`                                   | Open or activate the selected item              |
 | `/`                                       | Filter Guilds/Channels, search Messages/Members |

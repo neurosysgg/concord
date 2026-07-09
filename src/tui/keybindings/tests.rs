@@ -128,6 +128,43 @@ fn all_ui_action_names_round_trip() {
 }
 
 #[test]
+fn channel_switcher_toggle_pin_uses_alt_p_and_leaves_typing_intact() {
+    let key_bindings = KeyBindings::default();
+
+    let toggle = KeyEvent::new(KeyCode::Char('p'), KeyModifiers::ALT);
+    assert_eq!(
+        key_bindings.channel_switcher_action(toggle),
+        Some(ChannelSwitcherAction::TogglePin)
+    );
+
+    let typed = KeyEvent::new(KeyCode::Char('p'), KeyModifiers::NONE);
+    assert_eq!(
+        key_bindings.channel_switcher_action(typed),
+        Some(ChannelSwitcherAction::InsertQueryChar('p'))
+    );
+}
+
+#[test]
+fn channel_switcher_toggle_pin_is_remappable() {
+    let keymap = KeymapOptions {
+        mappings: [("ToggleChannelPin".to_owned(), KeymapBinding::one("<C-t>"))]
+            .into_iter()
+            .collect(),
+        ..KeymapOptions::default()
+    };
+    let key_bindings = KeyBindings::from_options(&keymap);
+
+    let old_default = KeyEvent::new(KeyCode::Char('p'), KeyModifiers::ALT);
+    assert_eq!(key_bindings.channel_switcher_action(old_default), None);
+
+    let remapped = KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL);
+    assert_eq!(
+        key_bindings.channel_switcher_action(remapped),
+        Some(ChannelSwitcherAction::TogglePin)
+    );
+}
+
+#[test]
 fn default_keymap_uses_leader_v_voice_group() {
     let key_bindings = KeyBindings::default();
     let mut prefix = key_bindings.leader_keymap_prefix();

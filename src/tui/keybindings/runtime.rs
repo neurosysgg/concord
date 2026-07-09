@@ -170,6 +170,13 @@ impl KeyBindings {
         if let Some(action) = self.selection_action(key, SelectionKeySet::TextSafe) {
             return Some(ChannelSwitcherAction::Select(action));
         }
+        if self
+            .keymap_single_key_shortcuts(UiAction::ToggleChannelPin)
+            .iter()
+            .any(|shortcut| shortcut.matches(key))
+        {
+            return Some(ChannelSwitcherAction::TogglePin);
+        }
 
         match key.code {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {

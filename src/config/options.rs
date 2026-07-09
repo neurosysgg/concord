@@ -272,6 +272,9 @@ pub struct UiStateOptions {
     /// DMs confirmed to hold enough of our own messages, persisted so the
     /// composer skips re-scanning history on every open.
     pub established_dms: Vec<Id<ChannelMarker>>,
+    /// Channels pinned for quick access in the channel switcher, most
+    /// recently pinned first.
+    pub pinned_channel_ids: Vec<Id<ChannelMarker>>,
 }
 
 impl Default for UiStateOptions {
@@ -287,6 +290,7 @@ impl Default for UiStateOptions {
             collapsed_server_folder_ids: Vec::new(),
             collapsed_server_folder_guilds: Vec::new(),
             established_dms: Vec::new(),
+            pinned_channel_ids: Vec::new(),
         }
     }
 }

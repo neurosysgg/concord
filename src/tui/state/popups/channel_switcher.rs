@@ -3,7 +3,10 @@ use std::collections::HashSet;
 use crate::discord::{ChannelState, ChannelUnreadState};
 use crate::tui::text_input::TextInputState;
 use crate::{
-    discord::ids::{Id, marker::GuildMarker},
+    discord::ids::{
+        Id,
+        marker::{ChannelMarker, GuildMarker},
+    },
     tui::fuzzy::{FuzzyMatchQuality, FuzzyScore, fuzzy_name_match_score},
 };
 
@@ -48,6 +51,11 @@ impl ChannelSwitcherState {
         let query = self.query.value().trim();
         self.query_items =
             (!query.is_empty()).then(|| filter_channel_switcher_items(&self.base_items, query));
+    }
+
+    fn set_base_items(&mut self, base_items: Vec<ChannelSwitcherItem>) {
+        self.base_items = base_items;
+        self.refresh_query_items();
     }
 }
 
@@ -169,6 +177,27 @@ impl DashboardState {
         }
     }
 
+    pub fn selected_channel_switcher_channel_id(&self) -> Option<Id<ChannelMarker>> {
+        let switcher = self.popups.channel_switcher()?;
+        let selected = switcher.selection.selected_for_len(switcher.visible_len());
+        switcher
+            .visible_items()
+            .get(selected)
+            .map(|item| item.channel_id)
+    }
+
+    pub fn toggle_selected_channel_switcher_pin(&mut self) {
+        let Some(channel_id) = self.selected_channel_switcher_channel_id() else {
+            return;
+        };
+        self.toggle_channel_pin(channel_id);
+
+        let items = self.all_channel_switcher_items();
+        if let Some(switcher) = self.popups.channel_switcher_mut() {
+            switcher.set_base_items(items);
+        }
+    }
+
     pub fn activate_selected_channel_switcher_item(&mut self) -> Option<AppCommand> {
         let item = {
             let switcher = self.popups.channel_switcher()?;
@@ -225,19 +254,58 @@ impl DashboardState {
             }
         }
 
-        let recent = self.recent_channel_switcher_items(&base);
-        if !recent.is_empty() {
-            for item in base.iter_mut() {
-                item.group_order = item.group_order.saturating_add(1);
-            }
+        for item in base.iter_mut() {
+            item.is_pinned = self
+                .navigation
+                .channels
+                .pinned_channel_ids
+                .contains(&item.channel_id);
         }
 
-        let mut items = recent;
+        let mut pinned = self.pinned_channel_switcher_items(&base);
+        let mut recent = self.recent_channel_switcher_items(&base);
+        let leading_groups = usize::from(!pinned.is_empty()) + usize::from(!recent.is_empty());
+        if leading_groups > 0 {
+            for item in base.iter_mut() {
+                item.group_order = item.group_order.saturating_add(leading_groups);
+            }
+        }
+        for item in pinned.iter_mut() {
+            item.group_order = 0;
+        }
+        for item in recent.iter_mut() {
+            item.group_order = usize::from(!pinned.is_empty());
+        }
+
+        let mut items = pinned;
+        items.extend(recent);
         items.extend(base);
         for (index, item) in items.iter_mut().enumerate() {
             item.original_index = index;
         }
         items
+    }
+
+    fn pinned_channel_switcher_items(
+        &self,
+        base: &[ChannelSwitcherItem],
+    ) -> Vec<ChannelSwitcherItem> {
+        let mut pinned = Vec::new();
+        let mut seen = HashSet::new();
+        for channel_id in &self.navigation.channels.pinned_channel_ids {
+            if !seen.insert(*channel_id) {
+                continue;
+            }
+            let Some(item) = base.iter().find(|item| item.channel_id == *channel_id) else {
+                continue;
+            };
+            let mut item = item.clone();
+            item.group_label = "Pinned Channels".to_owned();
+            item.parent_label = item.guild_name.clone();
+            item.depth = 0;
+            pinned.push(item);
+        }
+        pinned
     }
 
     fn recent_channel_switcher_items(
@@ -437,6 +505,7 @@ fn push_channel_switcher_item(
         depth,
         group_order,
         original_index,
+        is_pinned: false,
     });
 }
 
@@ -470,8 +539,16 @@ fn filter_channel_switcher_items(
                 .map(|(quality, score)| (quality, score, item.clone()))
         })
         .collect();
+    // Pinned channels always rank above unpinned ones, regardless of match
+    // quality: whatever's pinned should be at the top wherever it shows up.
     scored.sort_by_key(|(quality, score, item)| {
-        (*quality, *score, item.group_order, item.original_index)
+        (
+            !item.is_pinned,
+            *quality,
+            *score,
+            item.group_order,
+            item.original_index,
+        )
     });
     scored.into_iter().map(|(_, _, item)| item).collect()
 }

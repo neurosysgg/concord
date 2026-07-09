@@ -331,6 +331,172 @@ fn channel_switcher_query_matches_display_prefixes() {
 }
 
 #[test]
+fn channel_switcher_toggle_pin_adds_and_removes_pinned_group() {
+    let mut state = DashboardState::new();
+    state.push_event(guild_create_event(
+        Id::new(1),
+        "guild",
+        vec![
+            positioned_text_channel_info(Id::new(1), Id::new(11), "alerts", 0),
+            positioned_text_channel_info(Id::new(1), Id::new(12), "quiet", 1),
+        ],
+    ));
+
+    state.open_channel_switcher();
+    let row = state
+        .channel_switcher_items()
+        .iter()
+        .position(|item| item.channel_id == Id::new(12))
+        .expect("quiet channel listed");
+    state.select_channel_switcher_item(row);
+    state.toggle_selected_channel_switcher_pin();
+
+    let items = state.channel_switcher_items();
+    assert_eq!(items[0].group_label, "Pinned Channels");
+    assert_eq!(items[0].channel_id, Id::new(12));
+    assert!(items[0].is_pinned);
+    assert!(items.iter().any(|item| {
+        item.group_label == "guild" && item.channel_id == Id::new(12) && item.is_pinned
+    }));
+
+    let row = items
+        .iter()
+        .position(|item| item.group_label == "Pinned Channels")
+        .expect("pinned entry listed");
+    state.select_channel_switcher_item(row);
+    state.toggle_selected_channel_switcher_pin();
+
+    let items = state.channel_switcher_items();
+    assert!(
+        !items
+            .iter()
+            .any(|item| item.group_label == "Pinned Channels")
+    );
+    assert!(items.iter().all(|item| !item.is_pinned));
+}
+
+#[test]
+fn channel_switcher_pinned_group_sits_above_recent_and_boosts_search_ranking() {
+    let mut state = DashboardState::new();
+    state.push_event(guild_create_event(
+        Id::new(1),
+        "guild",
+        vec![
+            positioned_text_channel_info(Id::new(1), Id::new(11), "alerts", 0),
+            positioned_text_channel_info(Id::new(1), Id::new(12), "quiet", 1),
+        ],
+    ));
+    state.activate_channel(Id::new(11));
+    state.activate_channel(Id::new(12));
+
+    state.open_channel_switcher();
+    let row = state
+        .channel_switcher_items()
+        .iter()
+        .position(|item| item.channel_id == Id::new(11))
+        .expect("alerts channel listed");
+    state.select_channel_switcher_item(row);
+    state.toggle_selected_channel_switcher_pin();
+
+    let items = state.channel_switcher_items();
+    assert_eq!(items[0].group_label, "Pinned Channels");
+    assert_eq!(items[0].channel_id, Id::new(11));
+    assert_eq!(items[1].group_label, "Recent Channels");
+
+    for ch in "l".chars() {
+        state.push_channel_switcher_char(ch);
+    }
+    let filtered: Vec<Id<ChannelMarker>> = state
+        .channel_switcher_items()
+        .into_iter()
+        .map(|item| item.channel_id)
+        .collect();
+    assert_eq!(filtered[0], Id::new(11));
+}
+
+#[test]
+fn channel_switcher_pin_hard_overrides_search_ranking() {
+    let mut state = DashboardState::new();
+    state.push_event(guild_create_event(
+        Id::new(1),
+        "guild",
+        vec![
+            positioned_text_channel_info(Id::new(1), Id::new(11), "office", 0),
+            positioned_text_channel_info(Id::new(1), Id::new(12), "offtopic", 1),
+        ],
+    ));
+
+    state.open_channel_switcher();
+    for ch in "off".chars() {
+        state.push_channel_switcher_char(ch);
+    }
+    // Unpinned: the tighter "office" match outranks "offtopic".
+    let filtered: Vec<Id<ChannelMarker>> = state
+        .channel_switcher_items()
+        .into_iter()
+        .map(|item| item.channel_id)
+        .collect();
+    assert_eq!(filtered[0], Id::new(11));
+    state.close_channel_switcher();
+
+    state.open_channel_switcher();
+    let row = state
+        .channel_switcher_items()
+        .iter()
+        .position(|item| item.channel_id == Id::new(12))
+        .expect("offtopic channel listed");
+    state.select_channel_switcher_item(row);
+    state.toggle_selected_channel_switcher_pin();
+
+    for ch in "off".chars() {
+        state.push_channel_switcher_char(ch);
+    }
+    // Pinned "offtopic" now ranks first despite the weaker match.
+    let filtered: Vec<Id<ChannelMarker>> = state
+        .channel_switcher_items()
+        .into_iter()
+        .map(|item| item.channel_id)
+        .collect();
+    assert_eq!(filtered[0], Id::new(12));
+}
+
+#[test]
+fn channel_switcher_pin_persists_through_ui_state_round_trip() {
+    let mut state = state_with_channel_tree();
+
+    state.open_channel_switcher();
+    let row = state
+        .channel_switcher_items()
+        .iter()
+        .position(|item| item.channel_id == Id::new(11))
+        .expect("general channel listed");
+    state.select_channel_switcher_item(row);
+    state.toggle_selected_channel_switcher_pin();
+
+    let ui_state = state
+        .take_ui_state_save_request()
+        .expect("pin toggle should request a UI state save");
+    assert_eq!(ui_state.pinned_channel_ids, vec![Id::new(11)]);
+
+    let restored = DashboardState::new_with_options(
+        DisplayOptions::default(),
+        Default::default(),
+        Default::default(),
+        NotificationOptions::default(),
+        VoiceOptions::default(),
+        Default::default(),
+        ui_state,
+    );
+    assert!(
+        restored
+            .navigation
+            .channels
+            .pinned_channel_ids
+            .contains(&Id::new(11))
+    );
+}
+
+#[test]
 fn channel_switcher_query_edits_at_cursor() {
     let mut state = DashboardState::new();
     state.open_channel_switcher();

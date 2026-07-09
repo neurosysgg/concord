@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - fork-only
+
+### Features
+
+- Pin channels for quick access in the fuzzy channel switcher, with a "Pinned Channels" group that always ranks first in search, and a global `Alt+p` shortcut to pin/unpin whichever channel you're currently viewing
+
 ## [2.3.2] - 2026-07-08
 
 ### Bug Fixes

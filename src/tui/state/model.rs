@@ -22,6 +22,7 @@ pub struct ChannelSwitcherItem {
     pub depth: usize,
     pub group_order: usize,
     pub original_index: usize,
+    pub is_pinned: bool,
 }
 
 #[cfg(test)]
@@ -41,6 +42,7 @@ impl ChannelSwitcherItem {
             depth: 0,
             group_order: 0,
             original_index: 0,
+            is_pinned: false,
         }
     }
 }

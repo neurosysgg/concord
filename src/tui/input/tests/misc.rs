@@ -1,6 +1,39 @@
 use super::*;
 
 #[test]
+fn alt_p_toggles_pin_on_the_active_channel_outside_any_popup() {
+    let mut state = state_with_channel_tree();
+    state.focus_pane(FocusPane::Channels);
+    handle_key(&mut state, key(KeyCode::Down));
+    handle_key(&mut state, key(KeyCode::Enter));
+    assert_eq!(state.selected_channel_id(), Some(Id::new(11)));
+
+    handle_key(&mut state, alt_key(KeyCode::Char('p')));
+    assert!(
+        state
+            .take_ui_state_save_request()
+            .expect("pin toggle should request a UI state save")
+            .pinned_channel_ids
+            .contains(&Id::new(11))
+    );
+
+    state.open_channel_switcher();
+    let items = state.channel_switcher_items();
+    assert_eq!(items[0].group_label, "Pinned Channels");
+    assert_eq!(items[0].channel_id, Id::new(11));
+    state.close_channel_switcher();
+
+    handle_key(&mut state, alt_key(KeyCode::Char('p')));
+    assert!(
+        state
+            .take_ui_state_save_request()
+            .expect("unpin toggle should request a UI state save")
+            .pinned_channel_ids
+            .is_empty()
+    );
+}
+
+#[test]
 fn quit_key_requires_confirmation() {
     let mut state = DashboardState::new();
 
