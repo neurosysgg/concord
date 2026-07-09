@@ -748,7 +748,9 @@ selection_bg = "#282D5A"
 
 That's a representative subset. Check the [Theme options](./docs/theme-options.md) for the
 full field reference, or copy [`theme.toml.example`](./theme.toml.example) from the repo root
-for every themeable field already filled in at its default value.
+for every themeable field already filled in at its default value. The
+[`themes/`](./themes) directory has full example palettes to copy directly, such as
+[`themes/amethyst.toml`](./themes/amethyst.toml).
 
 ## Performance
 

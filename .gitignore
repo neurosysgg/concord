@@ -1,1 +1,4 @@
 /target
+/run-patched.sh
+/preview-theme.sh
+/.idea
