@@ -263,7 +263,13 @@ impl DashboardState {
         }
 
         let mut pinned = self.pinned_channel_switcher_items(&base);
+        // A pinned channel only ever shows up once, in the "Pinned Channels"
+        // group: drop it from "Recent Channels" and its normal guild/DM
+        // listing so it isn't duplicated across the switcher.
         let mut recent = self.recent_channel_switcher_items(&base);
+        recent.retain(|item| !item.is_pinned);
+        base.retain(|item| !item.is_pinned);
+
         let leading_groups = usize::from(!pinned.is_empty()) + usize::from(!recent.is_empty());
         if leading_groups > 0 {
             for item in base.iter_mut() {
@@ -305,6 +311,9 @@ impl DashboardState {
             item.depth = 0;
             pinned.push(item);
         }
+        // Unread pinned channels surface before read ones; ties keep
+        // pin order (most recently pinned first) via the stable sort.
+        pinned.sort_by_key(|item| matches!(item.unread, ChannelUnreadState::Seen));
         pinned
     }
 

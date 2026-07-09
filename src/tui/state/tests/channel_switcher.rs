@@ -355,9 +355,15 @@ fn channel_switcher_toggle_pin_adds_and_removes_pinned_group() {
     assert_eq!(items[0].group_label, "Pinned Channels");
     assert_eq!(items[0].channel_id, Id::new(12));
     assert!(items[0].is_pinned);
-    assert!(items.iter().any(|item| {
-        item.group_label == "guild" && item.channel_id == Id::new(12) && item.is_pinned
-    }));
+    // A pinned channel shows up exactly once, in the Pinned Channels group,
+    // not duplicated in its normal guild listing.
+    assert_eq!(
+        items
+            .iter()
+            .filter(|item| item.channel_id == Id::new(12))
+            .count(),
+        1
+    );
 
     let row = items
         .iter()
@@ -373,6 +379,12 @@ fn channel_switcher_toggle_pin_adds_and_removes_pinned_group() {
             .any(|item| item.group_label == "Pinned Channels")
     );
     assert!(items.iter().all(|item| !item.is_pinned));
+    // Unpinning brings it back into its normal guild listing.
+    assert!(
+        items
+            .iter()
+            .any(|item| item.group_label == "guild" && item.channel_id == Id::new(12))
+    );
 }
 
 #[test]
@@ -384,10 +396,12 @@ fn channel_switcher_pinned_group_sits_above_recent_and_boosts_search_ranking() {
         vec![
             positioned_text_channel_info(Id::new(1), Id::new(11), "alerts", 0),
             positioned_text_channel_info(Id::new(1), Id::new(12), "quiet", 1),
+            positioned_text_channel_info(Id::new(1), Id::new(13), "lounge", 2),
         ],
     ));
-    state.activate_channel(Id::new(11));
+    // 12 ends up recent (not active); 13 is active and excluded from Recent.
     state.activate_channel(Id::new(12));
+    state.activate_channel(Id::new(13));
 
     state.open_channel_switcher();
     let row = state
@@ -402,6 +416,7 @@ fn channel_switcher_pinned_group_sits_above_recent_and_boosts_search_ranking() {
     assert_eq!(items[0].group_label, "Pinned Channels");
     assert_eq!(items[0].channel_id, Id::new(11));
     assert_eq!(items[1].group_label, "Recent Channels");
+    assert_eq!(items[1].channel_id, Id::new(12));
 
     for ch in "l".chars() {
         state.push_channel_switcher_char(ch);
@@ -458,6 +473,52 @@ fn channel_switcher_pin_hard_overrides_search_ranking() {
         .map(|item| item.channel_id)
         .collect();
     assert_eq!(filtered[0], Id::new(12));
+}
+
+#[test]
+fn channel_switcher_pinned_group_shows_unread_channels_first() {
+    let mut state = DashboardState::new();
+    state.push_event(guild_create_event(
+        Id::new(1),
+        "guild",
+        vec![
+            ChannelInfo {
+                last_message_id: Some(Id::new(100)),
+                ..positioned_text_channel_info(Id::new(1), Id::new(11), "alerts", 0)
+            },
+            positioned_text_channel_info(Id::new(1), Id::new(12), "quiet", 1),
+        ],
+    ));
+    state.push_event(AppEvent::ReadStateInit {
+        entries: vec![read_state_info(Id::new(11), Some(Id::new(90)), 0)],
+    });
+
+    state.open_channel_switcher();
+    // Pin "quiet" (read) before "alerts" (unread), so pin order alone would
+    // put "quiet" on top - unread priority should still win.
+    let row = state
+        .channel_switcher_items()
+        .iter()
+        .position(|item| item.channel_id == Id::new(12))
+        .expect("quiet channel listed");
+    state.select_channel_switcher_item(row);
+    state.toggle_selected_channel_switcher_pin();
+
+    let row = state
+        .channel_switcher_items()
+        .iter()
+        .position(|item| item.channel_id == Id::new(11))
+        .expect("alerts channel listed");
+    state.select_channel_switcher_item(row);
+    state.toggle_selected_channel_switcher_pin();
+
+    let pinned: Vec<Id<ChannelMarker>> = state
+        .channel_switcher_items()
+        .into_iter()
+        .filter(|item| item.group_label == "Pinned Channels")
+        .map(|item| item.channel_id)
+        .collect();
+    assert_eq!(pinned, vec![Id::new(11), Id::new(12)]);
 }
 
 #[test]
