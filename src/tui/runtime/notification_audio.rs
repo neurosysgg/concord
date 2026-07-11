@@ -186,7 +186,7 @@ fn fill_notification_output<T>(
 }
 
 #[cfg(feature = "voice-playback")]
-fn log_notification_output_stream_error(error: cpal::StreamError) {
+fn log_notification_output_stream_error(error: cpal::Error) {
     logging::error(
         "voice",
         format!("notification audio output stream failed: {error}"),
@@ -395,7 +395,7 @@ fn decode_wav_samples(
     data: &[u8],
 ) -> std::result::Result<NotificationAudio, String> {
     let bytes_per_sample = usize::from(format.bits_per_sample / 8);
-    if bytes_per_sample == 0 || data.len() % bytes_per_sample != 0 {
+    if bytes_per_sample == 0 || !data.len().is_multiple_of(bytes_per_sample) {
         return Err("notification sound data is not sample-aligned".to_owned());
     }
     let samples = match (format.audio_format, format.bits_per_sample) {

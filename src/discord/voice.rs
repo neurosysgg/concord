@@ -55,7 +55,7 @@ use self::outbound::{VoiceOutboundSendEvent, VoiceOutboundSendOutcome, VoiceOutb
 #[cfg(test)]
 use ::opus::{Channels, Decoder as OpusDecoder};
 #[cfg(all(test, feature = "voice-playback"))]
-use audio_buffer::VoiceAudioBuffer;
+use audio_buffer::{VoiceAudioBuffer, VoiceAudioOutputStats};
 use audio_runtime::VoiceAudioRuntime;
 use dave::{VoiceDaveState, VoiceMediaPayload, voice_speaking_microphone_active};
 #[cfg(test)]
@@ -117,6 +117,8 @@ const VOICE_WEBSOCKET_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const VOICE_CONNECTION_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
 const UDP_DISCOVERY_PACKET_LEN: usize = 74;
 const UDP_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
+const UDP_KEEPALIVE_PACKET_LEN: usize = 8;
+const UDP_KEEPALIVE_INTERVAL: Duration = Duration::from_secs(5);
 const RTP_HEADER_MIN_LEN: usize = 12;
 const RTP_VERSION: u8 = 2;
 const DISCORD_VOICE_PAYLOAD_TYPE: u8 = 0x78;
@@ -194,6 +196,7 @@ const VOICE_PLAYBACK_FRAME_QUEUE: usize = 256;
 #[cfg(any(test, feature = "voice-playback"))]
 const VOICE_PLAYBACK_FRAME_DURATION: Duration = Duration::from_millis(20);
 const VOICE_PLAYBACK_POLL_DURATION: Duration = Duration::from_millis(10);
+const VOICE_OUTPUT_STATS_LOG_INTERVAL: Duration = Duration::from_secs(5);
 const VOICE_PLAYBACK_POLL_SAMPLES_PER_CHANNEL: usize = 480;
 #[cfg(feature = "voice-playback")]
 const VOICE_TRANSMIT_STATS_LOG_INTERVAL: Duration = Duration::from_secs(5);
@@ -205,6 +208,10 @@ const VOICE_OUTPUT_UNDERRUN_FADE_MILLIS: u32 = 5;
 const VOICE_OUTPUT_LOW_PASS_CUTOFF_HZ: f32 = 8_000.0;
 #[cfg(feature = "voice-playback")]
 const VOICE_AUDIO_OUTPUT_QUEUE: usize = 64;
+#[cfg(feature = "voice-playback")]
+const VOICE_AUDIO_OUTPUT_PREBUFFER_FRAMES: u64 = DISCORD_VOICE_SAMPLE_RATE as u64 * 60 / 1_000;
+#[cfg(all(feature = "voice-playback", target_os = "linux"))]
+const VOICE_PULSE_OUTPUT_BUFFER_FRAMES: u32 = 2_400;
 const AEAD_AES256_GCM_RTPSIZE: &str = "aead_aes256_gcm_rtpsize";
 const AEAD_XCHACHA20_POLY1305_RTPSIZE: &str = "aead_xchacha20_poly1305_rtpsize";
 const VOICE_REMOTE_SPEAKING_TTL: Duration = Duration::from_millis(500);
@@ -476,6 +483,7 @@ impl ManagedTask {
 
 struct VoiceChildTasks {
     heartbeat: ManagedTask,
+    udp_keepalive: ManagedTask,
     udp_receive: ManagedTask,
     #[cfg(feature = "voice-playback")]
     udp_transmit: Option<JoinHandle<()>>,
@@ -501,6 +509,7 @@ impl Default for VoiceChildTasks {
     fn default() -> Self {
         Self {
             heartbeat: ManagedTask::new("voice heartbeat task"),
+            udp_keepalive: ManagedTask::new("voice UDP keepalive task"),
             udp_receive: ManagedTask::new("voice UDP receive task"),
             #[cfg(feature = "voice-playback")]
             udp_transmit: None,
@@ -631,6 +640,10 @@ impl VoiceChildTasks {
         self.udp_receive.replace(task);
     }
 
+    fn replace_udp_keepalive(&mut self, task: JoinHandle<()>) {
+        self.udp_keepalive.replace(task);
+    }
+
     #[cfg(feature = "voice-playback")]
     async fn replace_udp_transmit(
         &mut self,
@@ -693,6 +706,7 @@ impl VoiceChildTasks {
 
     fn abort_all(&mut self) {
         self.heartbeat.abort();
+        self.udp_keepalive.abort();
         self.udp_receive.abort();
         #[cfg(feature = "voice-playback")]
         if let Some(task) = self.udp_transmit.take() {

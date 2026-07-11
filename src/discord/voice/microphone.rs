@@ -39,7 +39,8 @@ impl VoiceMicrophoneCapture {
         logging::debug(
             "voice",
             format!(
-                "voice microphone capture started: sample_rate={} channels={} format={:?} buffer_size={:?}",
+                "voice microphone capture started: host={} sample_rate={} channels={} format={:?} buffer_size={:?}",
+                host.id(),
                 stream_config.sample_rate,
                 stream_config.channels,
                 sample_format,
@@ -315,7 +316,7 @@ pub(super) fn build_voice_input_stream_f32(
     });
     device
         .build_input_stream(
-            config,
+            *config,
             move |input: &[f32], _| {
                 record_voice_input_chunk(input.len(), channels, &stats);
                 if let Some(pcm_frames) = pcm_frames.as_ref()
@@ -349,7 +350,7 @@ pub(super) fn build_voice_input_stream_i16(
     });
     device
         .build_input_stream(
-            config,
+            *config,
             move |input: &[i16], _| {
                 record_voice_input_chunk(input.len(), channels, &stats);
                 if let Some(pcm_frames) = pcm_frames.as_ref()
@@ -383,7 +384,7 @@ pub(super) fn build_voice_input_stream_u16(
     });
     device
         .build_input_stream(
-            config,
+            *config,
             move |input: &[u16], _| {
                 record_voice_input_chunk(input.len(), channels, &stats);
                 if let Some(pcm_frames) = pcm_frames.as_ref()
@@ -417,7 +418,7 @@ pub(super) fn build_voice_input_stream_u8(
     });
     device
         .build_input_stream(
-            config,
+            *config,
             move |input: &[u8], _| {
                 record_voice_input_chunk(input.len(), channels, &stats);
                 if let Some(pcm_frames) = pcm_frames.as_ref()
@@ -532,7 +533,7 @@ pub(super) fn voice_microphone_min_callback_frames(stats: &VoiceMicrophoneCaptur
 }
 
 #[cfg(feature = "voice-playback")]
-pub(super) fn log_voice_input_stream_error(error: cpal::StreamError) {
+pub(super) fn log_voice_input_stream_error(error: cpal::Error) {
     logging::error(
         "voice",
         format!("voice microphone input stream failed: {error}"),

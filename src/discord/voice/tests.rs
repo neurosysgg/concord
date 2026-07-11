@@ -741,7 +741,12 @@ fn voice_audio_buffer_resamples_non_48khz_output_clock() {
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
     tx.try_send(vec![0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0])
         .expect("decoded samples should queue");
-    let mut buffer = VoiceAudioBuffer::new(rx, 24_000);
+    let stats = Arc::new(VoiceAudioOutputStats::default());
+    stats
+        .queued_frames
+        .store(VOICE_AUDIO_OUTPUT_PREBUFFER_FRAMES, Ordering::Relaxed);
+    let mut buffer = VoiceAudioBuffer::new(rx, 24_000, stats);
+    buffer.begin_output();
 
     assert_eq!(buffer.next_stereo_frame(), Some([0.0, 0.0]));
     assert_eq!(buffer.next_stereo_frame(), Some([2.0, 2.0]));
@@ -758,7 +763,12 @@ fn voice_audio_buffer_fades_short_underruns() {
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
     tx.try_send(vec![1.0, -1.0])
         .expect("decoded samples should queue");
-    let mut buffer = VoiceAudioBuffer::new(rx, DISCORD_VOICE_SAMPLE_RATE);
+    let stats = Arc::new(VoiceAudioOutputStats::default());
+    stats
+        .queued_frames
+        .store(VOICE_AUDIO_OUTPUT_PREBUFFER_FRAMES, Ordering::Relaxed);
+    let mut buffer = VoiceAudioBuffer::new(rx, DISCORD_VOICE_SAMPLE_RATE, stats);
+    buffer.begin_output();
 
     assert_eq!(buffer.next_stereo_frame(), Some([1.0, -1.0]));
     let faded = buffer
@@ -1298,6 +1308,46 @@ fn udp_discovery_and_select_protocol_match_expected_shapes() {
         payload["d"]["data"]["mode"].as_str(),
         Some(AEAD_XCHACHA20_POLY1305_RTPSIZE)
     );
+}
+
+#[test]
+fn udp_keepalive_packet_round_trips_little_endian_counter() {
+    let packet = udp_keepalive_packet(0x01020304);
+
+    assert_eq!(packet, [0x04, 0x03, 0x02, 0x01, 0, 0, 0, 0]);
+    assert_eq!(parse_udp_keepalive_response(&packet), Some(0x01020304));
+    assert_eq!(parse_udp_keepalive_response(&packet[..7]), None);
+}
+
+#[tokio::test]
+async fn voice_udp_keepalive_sends_initial_counter() {
+    let receiver = UdpSocket::bind("127.0.0.1:0")
+        .await
+        .expect("receiver should bind");
+    let sender = Arc::new(
+        UdpSocket::bind("127.0.0.1:0")
+            .await
+            .expect("sender should bind"),
+    );
+    sender
+        .connect(
+            receiver
+                .local_addr()
+                .expect("receiver should have an address"),
+        )
+        .await
+        .expect("sender should connect");
+    let keepalive = tokio::spawn(run_voice_udp_keepalive(sender));
+    let mut packet = [0u8; UDP_KEEPALIVE_PACKET_LEN];
+
+    let received = timeout(Duration::from_secs(1), receiver.recv(&mut packet))
+        .await
+        .expect("keepalive should arrive")
+        .expect("receiver should read the keepalive");
+
+    keepalive.abort();
+    assert_eq!(received, UDP_KEEPALIVE_PACKET_LEN);
+    assert_eq!(parse_udp_keepalive_response(&packet), Some(0));
 }
 
 #[test]

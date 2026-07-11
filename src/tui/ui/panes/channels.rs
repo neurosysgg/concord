@@ -24,13 +24,13 @@ pub(in crate::tui::ui) fn render_channels(frame: &mut Frame, area: Rect, state: 
                 .fg(theme::current().accent)
                 .add_modifier(Modifier::BOLD),
         ))];
-        if header_area.height >= 2 {
-            if let Some(boost) = &boost_label {
-                lines.push(Line::from(Span::styled(
-                    truncate_display_width(boost, width),
-                    Style::default().fg(theme::current().dim),
-                )));
-            }
+        if header_area.height >= 2
+            && let Some(boost) = &boost_label
+        {
+            lines.push(Line::from(Span::styled(
+                truncate_display_width(boost, width),
+                Style::default().fg(theme::current().dim),
+            )));
         }
         frame.render_widget(Paragraph::new(lines), header_area);
     }
