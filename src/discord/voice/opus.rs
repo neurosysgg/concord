@@ -229,7 +229,7 @@ async fn run_voice_playback_decode(
     let mut playout_buffers = VoicePlaybackPlayoutBuffers::default();
     let mut post_process = VoicePlaybackPostProcess::default();
     let mut playout_tick = interval(VOICE_PLAYBACK_POLL_DURATION);
-    playout_tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    playout_tick.set_missed_tick_behavior(MissedTickBehavior::Burst);
     let mut output_stats_tick = interval(VOICE_OUTPUT_STATS_LOG_INTERVAL);
     output_stats_tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
     output_stats_tick.tick().await;

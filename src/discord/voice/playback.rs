@@ -482,7 +482,10 @@ impl VoiceAudioOutput {
             .default_output_config()
             .map_err(|error| format!("voice default audio output config failed: {error}"))?;
         let sample_format = supported_config.sample_format();
+        #[cfg(target_os = "linux")]
         let mut stream_config = supported_config.config();
+        #[cfg(not(target_os = "linux"))]
+        let stream_config = supported_config.config();
         #[cfg(target_os = "linux")]
         if host.id() == cpal::HostId::PulseAudio {
             stream_config.buffer_size = cpal::BufferSize::Fixed(VOICE_PULSE_OUTPUT_BUFFER_FRAMES);
