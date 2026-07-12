@@ -234,8 +234,9 @@ pub struct UiStateOptions {
     pub collapsed_channel_categories: Vec<Id<ChannelMarker>>,
     pub collapsed_server_folder_ids: Vec<u64>,
     pub collapsed_server_folder_guilds: Vec<Vec<Id<GuildMarker>>>,
-    /// DMs confirmed to hold enough of our own messages, persisted so the
-    /// composer skips re-scanning history on every open.
+    /// One-to-one DMs confirmed to contain a message from the current user.
+    /// This avoids reclassifying an established conversation when that message
+    /// later falls outside the latest 50-message window.
     pub established_dms: Vec<Id<ChannelMarker>>,
 }
 

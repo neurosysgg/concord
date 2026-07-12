@@ -10,11 +10,12 @@ pub(in crate::tui::ui) fn render_composer(
     let inner_width = composer_inner_width(area.width);
     let ready_urls = ready_custom_emoji_urls(emoji_images);
     let prompt = composer_lines_with_loaded_custom_emoji_urls(state, inner_width, &ready_urls);
-    let border_color = if state.is_composing() { ACCENT } else { DIM };
+    let composer_active = state.is_composing() && state.composer_lock().is_none();
+    let border_color = if composer_active { ACCENT } else { DIM };
 
     frame.render_widget(
         Paragraph::new(prompt)
-            .style(if state.is_composing() {
+            .style(if composer_active {
                 Style::default().fg(Color::White)
             } else {
                 Style::default().fg(DIM)
@@ -57,7 +58,8 @@ fn composer_cursor_position_with_loaded_custom_emoji_urls(
     state: &DashboardState,
     loaded_custom_emoji_urls: &[String],
 ) -> Option<Position> {
-    if !state.is_composing() || area.width < 3 || area.height < 3 {
+    if !state.is_composing() || state.composer_lock().is_some() || area.width < 3 || area.height < 3
+    {
         return None;
     }
 
@@ -512,10 +514,11 @@ pub(in crate::tui::ui) fn composer_lines_with_loaded_custom_emoji_urls(
     width: u16,
     loaded_custom_emoji_urls: &[String],
 ) -> Vec<Line<'static>> {
-    if state.is_composing()
-        || !state.composer_input().is_empty()
-        || !state.pending_composer_attachments().is_empty()
-        || state.clipboard_paste_pending()
+    if state.composer_lock().is_none()
+        && (state.is_composing()
+            || !state.composer_input().is_empty()
+            || !state.pending_composer_attachments().is_empty()
+            || state.clipboard_paste_pending())
     {
         let mut lines = pending_upload_lines(state, width);
         append_composer_upload_preview_lines(&mut lines, state, width);
@@ -543,8 +546,11 @@ pub(in crate::tui::ui) fn composer_lines_with_loaded_custom_emoji_urls(
 
     let text = composer_text(state, width);
     let wrapped = wrap_text_lines(&text, width as usize);
-    // A locked DM is a hard stop, so override the dimmed placeholder with red.
-    if state.dm_composer_lock().is_some() {
+    // A locked composer is a hard stop, so override the dimmed placeholder with red.
+    if state
+        .composer_lock()
+        .is_some_and(|lock| lock != ComposerLock::LoadingMessages)
+    {
         return wrapped
             .into_iter()
             .map(|subline| Line::from(Span::styled(subline, Style::default().fg(Color::Red))))
@@ -860,7 +866,7 @@ fn append_composer_upload_preview_rows<T>(
 }
 
 pub(in crate::tui::ui) fn composer_text(state: &DashboardState, width: u16) -> String {
-    if state.is_composing() {
+    if state.composer_lock().is_none() && state.is_composing() {
         let mut lines = pending_upload_texts(state, width);
         append_composer_upload_preview_texts(&mut lines, state, width);
         let input = prefixed_composer_input(state.composer_input());
@@ -875,9 +881,10 @@ pub(in crate::tui::ui) fn composer_text(state: &DashboardState, width: u16) -> S
         return lines.join("\n");
     }
 
-    if !state.composer_input().is_empty()
-        || !state.pending_composer_attachments().is_empty()
-        || state.clipboard_paste_pending()
+    if state.composer_lock().is_none()
+        && (!state.composer_input().is_empty()
+            || !state.pending_composer_attachments().is_empty()
+            || state.clipboard_paste_pending())
     {
         let mut lines = pending_upload_texts(state, width);
         append_composer_upload_preview_texts(&mut lines, state, width);
@@ -900,21 +907,32 @@ pub(in crate::tui::ui) fn composer_text(state: &DashboardState, width: u16) -> S
             }
             return format!("read-only · cannot create posts in {label}");
         }
-        if let Some(lock) = state.dm_composer_lock() {
+        if let Some(lock) = state.composer_lock() {
             return match lock {
-                DmComposerLock::Spam => {
+                ComposerLock::LoadingMessages => {
+                    format!("loading messages in {label}...")
+                }
+                ComposerLock::MessageLoadFailed => {
+                    format!("read-only · could not load messages in {label}. reopen it to retry")
+                }
+                ComposerLock::Spam => {
                     format!(
                         "read-only · {label} is flagged as spam. open it in the official app first"
                     )
                 }
-                DmComposerLock::MessageRequest => {
+                ComposerLock::MessageRequest => {
                     format!(
                         "read-only · {label} is a message request. accept it in the official app first"
                     )
                 }
-                DmComposerLock::NotEstablished => {
+                ComposerLock::NewConversation => {
                     format!(
-                        "read-only · {label} is a new conversation. send at least 5 messages from the official app and wait a day before sending here"
+                        "read-only · {label} is a new conversation. reply in the official app first"
+                    )
+                }
+                ComposerLock::EmptyChannel => {
+                    format!(
+                        "read-only · {label} has no messages. start it in the official app first"
                     )
                 }
             };

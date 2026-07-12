@@ -1,5 +1,40 @@
 use super::*;
 
+fn selected_dm_state(
+    last_message_id: Option<Id<MessageMarker>>,
+    ui_state: UiStateOptions,
+) -> DashboardState {
+    let mut state = DashboardState::new_with_options(
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        ui_state,
+    );
+    state.push_event(AppEvent::Ready {
+        user: "me".to_owned(),
+        user_id: Some(Id::new(1)),
+    });
+    state.push_event(AppEvent::ChannelUpsert(ChannelInfo {
+        last_message_id,
+        ..dm_channel_info(Id::new(20), "alice")
+    }));
+    state.confirm_selected_guild();
+    state.confirm_selected_channel();
+    state
+}
+
+fn dm_history_message(message_id: u64, author_id: u64) -> MessageInfo {
+    MessageInfo {
+        guild_id: None,
+        author_id: Id::new(author_id),
+        author: format!("user-{author_id}"),
+        ..MessageInfo::test(Id::new(20), Id::new(message_id))
+    }
+}
+
 #[test]
 fn direct_messages_are_sorted_by_latest_message_id() {
     let mut state = state_with_direct_messages();
@@ -84,157 +119,90 @@ fn restoring_discord_snapshot_recovers_missed_guilds_and_direct_messages() {
 }
 
 #[test]
-fn dm_composer_locks_until_conversation_is_established() {
+fn empty_dm_locks_the_composer_before_the_first_message() {
+    let mut state = selected_dm_state(None, UiStateOptions::default());
+
+    assert_eq!(state.composer_lock(), Some(ComposerLock::LoadingMessages));
+
+    state.push_event(latest_history_loaded(Id::new(20), Vec::new()));
+    assert_eq!(state.composer_lock(), Some(ComposerLock::EmptyChannel));
+}
+
+#[test]
+fn group_dm_unlocks_after_message_history_loads() {
     let mut state = DashboardState::new();
-    state.push_event(AppEvent::Ready {
-        user: "me".to_owned(),
-        user_id: Some(Id::new(1)),
-    });
-    state.push_event(AppEvent::ChannelUpsert(dm_channel_info(
-        Id::new(20),
-        "alice",
-    )));
+    state.push_event(AppEvent::ChannelUpsert(ChannelInfo {
+        last_message_id: Some(Id::new(200)),
+        name: "friends".to_owned(),
+        ..ChannelInfo::test(Id::new(20), "group-dm")
+    }));
     state.confirm_selected_guild();
     state.confirm_selected_channel();
-    assert_eq!(state.selected_channel_id(), Some(Id::new(20)));
 
-    // Only the other person has written, so the composer stays locked.
-    state.push_event(message_create_event(MessageCreateFixture {
+    assert_eq!(state.composer_lock(), Some(ComposerLock::LoadingMessages));
+
+    state.push_event(latest_history_loaded(Id::new(20), Vec::new()));
+    assert_eq!(state.composer_lock(), None);
+}
+
+#[test]
+fn existing_dm_waits_for_history_before_applying_the_conversation_lock() {
+    let state_before_history = || selected_dm_state(Some(Id::new(200)), UiStateOptions::default());
+
+    let mut established = state_before_history();
+    assert_eq!(
+        established.composer_lock(),
+        Some(ComposerLock::LoadingMessages)
+    );
+    established.push_event(latest_history_loaded(
+        Id::new(20),
+        vec![dm_history_message(200, 1)],
+    ));
+    assert_eq!(established.composer_lock(), None);
+    assert_eq!(
+        established
+            .take_ui_state_save_request()
+            .expect("established DM should request persistence")
+            .established_dms,
+        vec![Id::new(20)]
+    );
+
+    let mut new_conversation = state_before_history();
+    new_conversation.push_event(latest_history_loaded(
+        Id::new(20),
+        vec![dm_history_message(200, 99)],
+    ));
+    assert_eq!(
+        new_conversation.composer_lock(),
+        Some(ComposerLock::NewConversation)
+    );
+
+    new_conversation.push_event(message_create_event(MessageCreateFixture {
         guild_id: None,
         channel_id: Id::new(20),
-        message_id: Id::new(200),
-        author_id: Id::new(99),
-        content: Some("hi".to_owned()),
-        ..guild_message_create_fixture()
-    }));
-    assert_eq!(
-        state.dm_composer_lock(),
-        Some(DmComposerLock::NotEstablished)
-    );
-    assert!(!state.can_send_in_selected_channel());
-
-    for message_id in 201..205 {
-        state.push_event(message_create_event(MessageCreateFixture {
-            guild_id: None,
-            channel_id: Id::new(20),
-            message_id: Id::new(message_id),
-            author_id: Id::new(1),
-            content: Some("hey".to_owned()),
-            ..guild_message_create_fixture()
-        }));
-    }
-    assert_eq!(
-        state.dm_composer_lock(),
-        Some(DmComposerLock::NotEstablished)
-    );
-    state.start_composer();
-    assert!(!state.is_composing());
-
-    state.push_event(message_create_event(MessageCreateFixture {
-        guild_id: None,
-        channel_id: Id::new(20),
-        message_id: Id::new(205),
+        message_id: Id::new(201),
         author_id: Id::new(1),
-        content: Some("hey".to_owned()),
+        content: Some("hello".to_owned()),
         ..guild_message_create_fixture()
     }));
-    assert_eq!(state.dm_composer_lock(), None);
-    assert!(state.can_send_in_selected_channel());
-    state.start_composer();
-    assert!(state.is_composing());
-}
+    assert_eq!(new_conversation.composer_lock(), None);
 
-#[test]
-fn dm_composer_locks_fresh_dm_until_a_day_has_passed() {
-    let mut state = DashboardState::new();
-    state.push_event(AppEvent::Ready {
-        user: "me".to_owned(),
-        user_id: Some(Id::new(1)),
-    });
-    let created_ms = 1_700_000_000_000u64;
-    let channel_id = Id::new((created_ms - 1_420_070_400_000) << 22);
-    state.push_event(AppEvent::ChannelUpsert(dm_channel_info(
-        channel_id, "alice",
-    )));
-    state.confirm_selected_guild();
-    state.confirm_selected_channel();
-
-    for message_id in 201..206 {
-        state.push_event(message_create_event(MessageCreateFixture {
-            guild_id: None,
-            channel_id,
-            message_id: Id::new(message_id),
-            author_id: Id::new(1),
-            content: Some("hey".to_owned()),
-            ..guild_message_create_fixture()
-        }));
-    }
-
-    let same_day = created_ms + 60 * 60 * 1000;
-    assert_eq!(
-        state.dm_composer_lock_at(same_day),
-        Some(DmComposerLock::NotEstablished)
+    let mut restored = selected_dm_state(
+        Some(Id::new(200)),
+        UiStateOptions {
+            established_dms: vec![Id::new(20)],
+            ..UiStateOptions::default()
+        },
     );
-
-    let next_day = created_ms + 25 * 60 * 60 * 1000;
-    assert_eq!(state.dm_composer_lock_at(next_day), None);
-}
-
-#[test]
-fn recording_dm_established_unlocks_composer_and_persists() {
-    let mut state = DashboardState::new();
-    state.push_event(AppEvent::Ready {
-        user: "me".to_owned(),
-        user_id: Some(Id::new(1)),
-    });
-    state.push_event(AppEvent::ChannelUpsert(dm_channel_info(
+    restored.push_event(latest_history_loaded(
         Id::new(20),
-        "alice",
-    )));
-    state.confirm_selected_guild();
-    state.confirm_selected_channel();
-    assert_eq!(
-        state.dm_composer_lock(),
-        Some(DmComposerLock::NotEstablished)
-    );
-
-    state.push_event(AppEvent::DmEstablished {
-        channel_id: Id::new(20),
-    });
-    assert_eq!(state.dm_composer_lock(), None);
-    assert!(state.can_send_in_selected_channel());
-
-    let saved = state
-        .take_ui_state_save_request()
-        .expect("establishing a DM requests a save");
-    assert!(saved.established_dms.contains(&Id::new(20)));
+        vec![dm_history_message(200, 99)],
+    ));
+    assert_eq!(restored.composer_lock(), None);
 }
 
 #[test]
-fn opening_a_fresh_dm_enqueues_an_establishment_check() {
-    let mut state = DashboardState::new();
-    state.push_event(AppEvent::Ready {
-        user: "me".to_owned(),
-        user_id: Some(Id::new(1)),
-    });
-    state.push_event(AppEvent::ChannelUpsert(dm_channel_info(
-        Id::new(20),
-        "alice",
-    )));
-    state.confirm_selected_guild();
-    state.confirm_selected_channel();
-
-    assert!(
-        state
-            .drain_pending_commands()
-            .contains(&AppCommand::VerifyDmEstablished {
-                channel_id: Id::new(20),
-            })
-    );
-}
-
-#[test]
-fn dm_composer_locks_message_request_and_spam_dms_even_after_replying() {
+fn message_request_and_spam_dms_stay_locked_after_a_reply() {
     let mut state = DashboardState::new();
     state.push_event(AppEvent::Ready {
         user: "me".to_owned(),
@@ -258,18 +226,15 @@ fn dm_composer_locks_message_request_and_spam_dms_even_after_replying() {
         content: Some("hey".to_owned()),
         ..guild_message_create_fixture()
     }));
-    assert_eq!(
-        state.dm_composer_lock(),
-        Some(DmComposerLock::MessageRequest)
-    );
-    assert!(!state.can_send_in_selected_channel());
+    state.push_event(latest_history_loaded(Id::new(20), Vec::new()));
+    assert_eq!(state.composer_lock(), Some(ComposerLock::MessageRequest));
 
     // Spam classification takes precedence and reports the spam reason.
     state.push_event(AppEvent::ChannelUpsert(ChannelInfo {
         is_spam: Some(true),
         ..dm_channel_info(Id::new(20), "stranger")
     }));
-    assert_eq!(state.dm_composer_lock(), Some(DmComposerLock::Spam));
+    assert_eq!(state.composer_lock(), Some(ComposerLock::Spam));
 }
 
 #[test]

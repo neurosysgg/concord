@@ -9,11 +9,11 @@ use crate::discord::test_builders::{
     CurrentUserReactionAddFixture, ForumPostsLoadedFixture, GuildCreateFixture,
     MessageCreateFixture, MessageHistoryAfterLoadedFixture, MessageHistoryAroundLoadedFixture,
     MessageHistoryLoadedFixture, MessagePinnedUpdateFixture, ReactionUsersLoadedFixture,
-    VoiceConnectionStatusChangedFixture, current_user_reaction_add_event, forum_posts_loaded_event,
-    guild_create_event, guild_message_create_fixture, message_create_event,
-    message_history_after_loaded_event, message_history_around_loaded_event,
-    message_history_loaded_event, message_pinned_update_event, reaction_users_loaded_event,
-    voice_connection_status_changed_event,
+    VoiceConnectionStatusChangedFixture, current_user_reaction_add_event,
+    empty_latest_message_history_loaded_event, forum_posts_loaded_event, guild_create_event,
+    guild_message_create_fixture, message_create_event, message_history_after_loaded_event,
+    message_history_around_loaded_event, message_history_loaded_event, message_pinned_update_event,
+    reaction_users_loaded_event, voice_connection_status_changed_event,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
@@ -28,8 +28,8 @@ use crate::{
         CustomEmojiInfo, DownloadAttachmentSource, EmbedInfo, GuildFolder,
         GuildNotificationSettingsInfo, MemberInfo, MessageInfo, MessageReferenceInfo,
         MessageSnapshotInfo, MicrophoneSensitivityDb, NotificationLevel, PollAnswerInfo, PollInfo,
-        PresenceStatus, ReactionEmoji, ReactionUserInfo, RoleInfo, UserGuildSettingsInfo,
-        UserSettingsInfo, VoiceConnectionStatus, VoiceVolumePercent,
+        PresenceStatus, ReactionEmoji, ReactionUserInfo, ReadStateInfo, RoleInfo,
+        UserGuildSettingsInfo, UserSettingsInfo, VoiceConnectionStatus, VoiceVolumePercent,
     },
     tui::state::{ChannelPaneEntry, DashboardState, FocusPane, GuildPaneEntry, MessageActionKind},
 };
@@ -196,6 +196,8 @@ fn state_with_channel_tree() -> DashboardState {
                 parent_id: Some(category_id),
                 position: Some(0),
                 name: "general".to_owned(),
+                last_message_id: Some(Id::new(1)),
+                message_count: Some(1),
                 ..ChannelInfo::test(general_id, "text")
             },
             ChannelInfo {
@@ -203,11 +205,28 @@ fn state_with_channel_tree() -> DashboardState {
                 parent_id: Some(category_id),
                 position: Some(1),
                 name: "random".to_owned(),
+                last_message_id: Some(Id::new(1)),
+                message_count: Some(1),
                 ..ChannelInfo::test(random_id, "text")
             },
         ],
         ..GuildCreateFixture::new(guild_id)
     }));
+    state.push_event(AppEvent::ReadStateInit {
+        entries: vec![
+            ReadStateInfo {
+                last_acked_message_id: Some(Id::new(1)),
+                ..ReadStateInfo::test(general_id)
+            },
+            ReadStateInfo {
+                last_acked_message_id: Some(Id::new(1)),
+                ..ReadStateInfo::test(random_id)
+            },
+        ],
+    });
+    for channel_id in [general_id, random_id] {
+        state.push_event(empty_latest_message_history_loaded_event(channel_id));
+    }
     state.confirm_selected_guild();
     state
 }
@@ -260,6 +279,7 @@ fn state_with_messages_from_state(mut state: DashboardState, count: u64) -> Dash
     for id in 1..=count {
         push_guild_message(&mut state, id, format!("msg {id}"));
     }
+    state.push_event(empty_latest_message_history_loaded_event(channel_id));
     state
 }
 

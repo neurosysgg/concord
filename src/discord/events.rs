@@ -143,9 +143,6 @@ pub enum AppEvent {
         user_id: Option<Id<UserMarker>>,
     },
     SignedOut,
-    DmEstablished {
-        channel_id: Id<ChannelMarker>,
-    },
     CurrentUserCapabilities {
         premium_tier: PremiumTier,
     },
@@ -575,7 +572,6 @@ define_app_event_kinds! {
     GatewayDispatchReceived: AppEvent::GatewayDispatchReceived { .. },
     Ready: AppEvent::Ready { .. },
     SignedOut: AppEvent::SignedOut,
-    DmEstablished: AppEvent::DmEstablished { .. },
     CurrentUserCapabilities: AppEvent::CurrentUserCapabilities { .. },
     UserIdentityUpdate: AppEvent::UserIdentityUpdate { .. },
     ApplicationCommandsLoaded: AppEvent::ApplicationCommandsLoaded { .. },
@@ -880,6 +876,15 @@ pub(crate) mod test_builders {
             before: f.before,
             messages: f.messages,
         }
+    }
+
+    pub(crate) fn empty_latest_message_history_loaded_event(
+        channel_id: Id<ChannelMarker>,
+    ) -> AppEvent {
+        message_history_loaded_event(MessageHistoryLoadedFixture {
+            channel_id,
+            ..MessageHistoryLoadedFixture::new()
+        })
     }
 
     pub(crate) struct MessageHistoryLoadFailedFixture {
@@ -1641,8 +1646,7 @@ impl AppEventKind {
             | AppEventKind::RichPresenceDetected
             | AppEventKind::GatewayResumed
             | AppEventKind::GatewayReidentified
-            | AppEventKind::GatewayClosed
-            | AppEventKind::DmEstablished => AppEventMetadata::effect_only(),
+            | AppEventKind::GatewayClosed => AppEventMetadata::effect_only(),
 
             AppEventKind::VoiceServerUpdate => AppEventMetadata::inert(),
 

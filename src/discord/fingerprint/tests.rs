@@ -1,9 +1,11 @@
 use super::*;
+use crate::discord::auth_http::DiscordAuthSession;
 use reqwest::header::{ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, ORIGIN, REFERER, USER_AGENT};
 use serde_json::Value;
 use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
+    sync::Arc,
     thread,
 };
 
@@ -26,14 +28,14 @@ fn finds_sentry_asset_path_in_app_html() {
 
 #[test]
 fn rest_headers_match_web_fingerprint_plan() {
-    let headers = discord_rest_headers();
-    let identity = client_identity();
+    let fingerprint = ClientFingerprint::new(CLIENT_BUILD_NUMBER);
+    let headers = discord_rest_headers(&fingerprint);
 
     assert_eq!(
         headers
             .get(USER_AGENT)
             .and_then(|value| value.to_str().ok()),
-        Some(identity.user_agent.as_str())
+        Some(fingerprint.user_agent.as_str())
     );
     assert_eq!(
         headers.get(ACCEPT).and_then(|value| value.to_str().ok()),
@@ -49,7 +51,7 @@ fn rest_headers_match_web_fingerprint_plan() {
         headers
             .get(ACCEPT_LANGUAGE)
             .and_then(|value| value.to_str().ok()),
-        Some(ACCEPT_LANGUAGE_VALUE)
+        Some(accept_language(&fingerprint.system_locale).as_str())
     );
     assert_eq!(
         headers.get(ORIGIN).and_then(|value| value.to_str().ok()),
@@ -87,13 +89,13 @@ fn rest_headers_match_web_fingerprint_plan() {
         headers
             .get("X-Discord-Locale")
             .and_then(|value| value.to_str().ok()),
-        Some(DISCORD_LOCALE)
+        Some(fingerprint.system_locale.as_str())
     );
     assert_eq!(
         headers
             .get("X-Discord-Timezone")
             .and_then(|value| value.to_str().ok()),
-        Some(DISCORD_TIMEZONE)
+        Some(fingerprint.timezone.as_str())
     );
     assert_eq!(
         headers
@@ -106,22 +108,22 @@ fn rest_headers_match_web_fingerprint_plan() {
 
 #[test]
 fn super_properties_are_base64_encoded_web_fields() {
-    let identity = client_identity();
-    let encoded = build_super_properties(&identity);
+    let fingerprint = ClientFingerprint::new(CLIENT_BUILD_NUMBER);
+    let encoded = build_super_properties(&fingerprint);
     let decoded = STANDARD
         .decode(encoded)
         .expect("super properties should decode from base64");
     let value: Value =
         serde_json::from_slice(&decoded).expect("super properties should decode as json");
 
-    assert_eq!(value["os"], identity.os);
+    assert_eq!(value["os"], fingerprint.os);
     assert_eq!(value["device"], "");
     assert_eq!(value["browser"], CLIENT_BROWSER);
     assert_eq!(value["release_channel"], "stable");
-    assert_eq!(value["os_arch"], identity.os_arch);
-    assert_eq!(value["system_locale"], SYSTEM_LOCALE);
+    assert_eq!(value["os_arch"], fingerprint.os_arch);
+    assert_eq!(value["system_locale"], fingerprint.system_locale);
     assert_eq!(value["has_client_mods"], false);
-    assert_eq!(value["browser_user_agent"], identity.user_agent);
+    assert_eq!(value["browser_user_agent"], fingerprint.user_agent);
     assert_eq!(value["browser_version"], CLIENT_BROWSER_VERSION);
     assert_eq!(value["client_build_number"], CLIENT_BUILD_NUMBER);
     assert!(value["client_event_source"].is_null());
@@ -160,6 +162,35 @@ fn launch_signature_applies_discord_mask() {
     }
 }
 
+#[test]
+fn system_locale_normalization_accepts_language_tags_and_rejects_process_locales() {
+    let cases = [
+        ("ko_KR.UTF-8", Some("ko-KR")),
+        ("en_US@calendar", Some("en-US")),
+        ("zh_Hans_CN.UTF-8", Some("zh-Hans-CN")),
+        ("C.UTF-8", None),
+        ("POSIX", None),
+        ("invalid locale", None),
+    ];
+
+    for (raw, expected) in cases {
+        assert_eq!(normalize_system_locale(raw).as_deref(), expected);
+    }
+
+    assert_eq!(accept_language("en"), "en");
+    assert_eq!(accept_language("en-US"), "en-US,en;q=0.9");
+    assert_eq!(accept_language("ko-KR"), "ko-KR,ko;q=0.9,en;q=0.8");
+}
+
+#[test]
+fn windows_version_extracts_the_numeric_os_version() {
+    assert_eq!(
+        windows_version("Microsoft Windows [Version 10.0.26100.4652]").as_deref(),
+        Some("10.0.26100.4652")
+    );
+    assert_eq!(windows_version("Microsoft Windows"), None);
+}
+
 fn assert_uuid_field(value: &Value, field: &str) {
     let raw = value[field]
         .as_str()
@@ -168,8 +199,10 @@ fn assert_uuid_field(value: &Value, field: &str) {
 }
 
 #[test]
-fn rest_client_sends_default_headers_and_replays_cookies() {
+fn shared_auth_session_sends_fingerprint_headers_and_replays_cookies() {
     let _ = rustls::crypto::ring::default_provider().install_default();
+    let fingerprint = Arc::new(ClientFingerprint::new(CLIENT_BUILD_NUMBER));
+    let auth_session = DiscordAuthSession::new(Arc::clone(&fingerprint));
     let listener = TcpListener::bind("127.0.0.1:0").expect("test server should bind");
     let address = listener
         .local_addr()
@@ -211,16 +244,20 @@ fn rest_client_sends_default_headers_and_replays_cookies() {
 
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime should start");
     runtime.block_on(async {
-        let client = discord_rest_client();
-        client
+        auth_session
+            .http()
             .get(format!("http://{address}/first"))
+            .headers(discord_rest_headers(&fingerprint))
             .send()
             .await
             .expect("first local request should succeed")
             .error_for_status()
             .expect("first local response should be successful");
-        client
+        auth_session
+            .clone()
+            .http()
             .get(format!("http://{address}/second"))
+            .headers(discord_rest_headers(&fingerprint))
             .send()
             .await
             .expect("second local request should succeed")
