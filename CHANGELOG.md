@@ -19,7 +19,32 @@ All notable changes to this project will be documented in this file.
 
 
 
-## [2.3.3] - 2026-07-08
+
+## [2.3.5] - 2026-07-12
+
+### Bug Fixes
+
+- Apply burst playout tick recovery by @chojs23
+
+### Features
+
+- Support all CPAL linear PCM audio output formats by @chojs23
+- _(voice)_ Size dynamically voice prebuffer from the current audio callback by @chojs23
+
+## [2.3.4] - 2026-07-12
+
+### Bug Fixes
+
+- Add voice UDP keepalive for listen-only sessions by @chojs23
+- Share fingerprint across REST, and Gateway (#252) in [#252](https://github.com/chojs23/concord/pull/252) by @chojs23
+- Unify member selection markers and update the group DM icon by @chojs23
+- Use the default output device format on every OS by @chojs23
+
+### Documentation
+
+- Update README by @chojs23
+
+## [2.3.3] - 2026-07-11
 
 ### Bug Fixes
 

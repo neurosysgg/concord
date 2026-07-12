@@ -15,7 +15,11 @@ mod voice_commands;
 
 use tokio::sync::mpsc;
 
-use crate::{DiscordClient, Result, config, discord::AppEvent, logging, tui, version_check};
+use crate::{
+    DiscordClient, Result, config,
+    discord::{AppEvent, DiscordAuthSession},
+    logging, tui, version_check,
+};
 
 use self::{
     command_loop::start_command_loop,
@@ -33,15 +37,13 @@ impl App {
 
     pub async fn run(self) -> Result<()> {
         loop {
-            let resolved_token = resolve_token().await?;
+            let (fingerprint, http) = crate::discord::load_client_fingerprint_and_http().await;
+            let auth_session = DiscordAuthSession::with_http(fingerprint, http);
+            let resolved_token = resolve_token(auth_session.clone()).await?;
             let token = resolved_token.token;
             let token_warnings = resolved_token.warnings;
 
-            // Must run before the REST client bakes the build number into
-            // X-Super-Properties and the gateway sends IDENTIFY.
-            crate::discord::refresh_client_build_number().await;
-
-            let client = DiscordClient::new(token)?;
+            let client = DiscordClient::new_with_auth_session(token, auth_session)?;
             let effects = client.take_effects();
             let snapshots = client.subscribe_snapshots();
             let (commands_tx, commands_rx) = mpsc::channel(64);

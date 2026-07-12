@@ -6,8 +6,8 @@ use std::{
 use crate::discord::ids::{Id, marker::MessageMarker};
 use crate::discord::test_builders::{
     ForumPostsLoadedFixture, GuildCreateFixture, MessageCreateFixture, MessageHistoryLoadedFixture,
-    forum_posts_loaded_event, guild_create_event, guild_message_create_fixture,
-    message_create_event, message_history_loaded_event,
+    empty_latest_message_history_loaded_event, forum_posts_loaded_event, guild_create_event,
+    guild_message_create_fixture, message_create_event, message_history_loaded_event,
 };
 use ratatui::{
     Terminal,
@@ -21,7 +21,7 @@ use unicode_width::UnicodeWidthStr;
 use super::{
     ImagePreview, ImagePreviewState, MESSAGE_AVATAR_OFFSET, MemberEntry,
     attachment_viewer_image_area, attachment_viewer_popup, background_media_occlusion_areas,
-    centered_viewer_preview_area, channel_action_menu_lines_for_test,
+    centered_viewer_preview_area, channel_action_menu_lines_for_test, channel_prefix,
     channel_switcher_cursor_position, channel_switcher_lines, channel_unread_decoration,
     composer_content_line_count, composer_cursor_position, composer_lines,
     composer_lines_with_loaded_custom_emoji_urls, composer_prompt_line_count, composer_text,
@@ -71,9 +71,9 @@ use crate::{
         },
         state::{
             AppliedForumTag, AttachmentDownloadProgressView, AttachmentViewerZoom,
-            ChannelSwitcherItem, ChannelThreadItem, DashboardState, DisplayOptionItem,
-            EmojiPickerEntry, EmojiReactionItem, FocusPane, MessageActionItem, MessageActionKind,
-            PollVotePickerItem,
+            ChannelSwitcherItem, ChannelThreadItem, ComposerLock, DashboardState,
+            DisplayOptionItem, EmojiPickerEntry, EmojiReactionItem, FocusPane, MessageActionItem,
+            MessageActionKind, PollVotePickerItem,
         },
         text::{TextHighlightKind, truncate_display_width, truncate_display_width_from},
         ui::{MouseTarget, PopupListTarget, mouse_target_at},
@@ -316,6 +316,7 @@ fn seed_channel_message(
         content: Some(content.to_owned()),
         ..guild_message_create_fixture()
     }));
+    state.push_event(empty_latest_message_history_loaded_event(channel_id));
     state
 }
 
