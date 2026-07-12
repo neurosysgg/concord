@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.5] - 2026-07-12
+
+### Bug Fixes
+
+- Apply burst playout tick recovery by @chojs23
+
+### Features
+
+- Support all CPAL linear PCM audio output formats by @chojs23
+- _(voice)_ Size dynamically voice prebuffer from the current audio callback by @chojs23
+
 ## [2.3.4] - 2026-07-12
 
 ### Bug Fixes
