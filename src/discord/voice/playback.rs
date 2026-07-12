@@ -478,7 +478,9 @@ impl VoiceAudioOutput {
         let device = host
             .default_output_device()
             .ok_or_else(|| "no default audio output device is available".to_owned())?;
-        let supported_config = select_voice_output_config(&device)?;
+        let supported_config = device
+            .default_output_config()
+            .map_err(|error| format!("voice default audio output config failed: {error}"))?;
         let sample_format = supported_config.sample_format();
         let mut stream_config = supported_config.config();
         #[cfg(target_os = "linux")]
@@ -514,40 +516,6 @@ impl VoiceAudioOutput {
             stats,
             _stream: stream,
         })
-    }
-}
-
-#[cfg(feature = "voice-playback")]
-fn select_voice_output_config(
-    device: &cpal::Device,
-) -> Result<cpal::SupportedStreamConfig, String> {
-    let sample_rate = DISCORD_VOICE_SAMPLE_RATE;
-    let configs = device
-        .supported_output_configs()
-        .map_err(|error| format!("voice audio output config query failed: {error}"))?;
-    if let Some(config) = configs
-        .filter(|config| {
-            config.channels() == DISCORD_VOICE_CHANNELS
-                && config.min_sample_rate() <= sample_rate
-                && config.max_sample_rate() >= sample_rate
-        })
-        .min_by_key(|config| voice_output_sample_format_rank(config.sample_format()))
-    {
-        return Ok(config.with_sample_rate(sample_rate));
-    }
-    device
-        .default_output_config()
-        .map_err(|error| format!("voice default audio output config failed: {error}"))
-}
-
-#[cfg(feature = "voice-playback")]
-fn voice_output_sample_format_rank(format: cpal::SampleFormat) -> u8 {
-    match format {
-        cpal::SampleFormat::F32 => 0,
-        cpal::SampleFormat::I16 => 1,
-        cpal::SampleFormat::U16 => 2,
-        cpal::SampleFormat::U8 => 3,
-        _ => 4,
     }
 }
 
