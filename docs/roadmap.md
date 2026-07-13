@@ -166,3 +166,113 @@ display.
   concord-local list, pending the protobuf-settings research above.
 - Whether `/tenor` and `/gif` should behave identically (Discord's real
   client treats them as synonyms) or diverge.
+
+## Fix: reply preview shows "<empty message>" for embed-only messages
+
+Noticed in daily use: replying to (or viewing a reply to) a message that's
+just an auto-unfurled link — no text content, just an embed — shows the
+literal `<empty message>` fallback in the reply-quote line, even though the
+real message renders fine in the main pane.
+
+### Root cause
+
+`format_reply_line` (`src/tui/message/format.rs:735-750`) builds the quote
+line from `display_text_with_stickers(reply.content, reply.stickers)`. But
+`ReplyInfo` (`src/discord/message.rs:351-357`) only carries
+`author_id`/`author`/`content`/`stickers`/`mentions` — no embed data at
+all. So when the replied-to message is embed-only, `content` is `None` and
+`stickers` is empty, `display_text_with_stickers` has nothing to return,
+and the `unwrap_or_else` fallback fires.
+
+### Fix shape
+
+1. Add an embed-presence signal to `ReplyInfo` — doesn't need the full
+   `EmbedInfo`, just enough to render something better than "<empty
+   message>" (e.g. a bool, or an embed count/title if cheaply available at
+   parse time).
+2. Populate it in the gateway parser wherever `ReplyInfo` is currently
+   built (same place `stickers` already gets threaded through).
+3. Update `display_text_with_stickers`'s emptiness check (or
+   `format_reply_line` directly) to fall back to something like `[Embed]`
+   instead of `<empty message>` when there's no content/stickers but the
+   embed flag is set.
+
+Small, additive, single-purpose fix — no architectural questions here.
+
+## Remember last-viewed channel per server
+
+Right now switching guilds always drops you to no channel selected, even if
+you were previously sitting in a specific channel on that server.
+
+### Root cause
+
+`activate_guild` (`src/tui/state/guilds.rs:555-570`) unconditionally runs
+`self.navigation.channels.active_channel_id = None` (plus resets scroll/
+selection) on every guild switch — there's no lookup for "what was I
+looking at here last."
+
+### Fix shape
+
+1. Add a small map, e.g. `last_active_channel: HashMap<ActiveGuildScope,
+   Id<ChannelMarker>>`, alongside `navigation.channels` state — same tier
+   as existing per-guild UI state like `collapsed_folders`.
+2. Record into it whenever `active_channel_id` changes away from a
+   channel (or on guild switch, before it gets cleared).
+3. In `activate_guild`, look up the entry for the incoming scope instead
+   of hard-setting `None` — fall back to `None` if there's no entry
+   (first visit, or the channel got deleted/is no longer visible).
+4. Decide whether this persists across restarts (goes in
+   `UiStateOptions`, like pinned channels/emoji) or is session-only — recommend
+   session-only for v1 given it's a smaller, more speculative feature than
+   the persisted pin lists.
+
+### Open questions, not decided yet
+
+- Persist across restarts or session-only (see above).
+- What happens if the remembered channel is no longer visible (deleted,
+  permissions changed, channel got archived) — fall back to the guild's
+  default/first channel, same as a fresh guild visit today.
+
+## Generalize pinned-item storage (channels + emoji share one shape)
+
+Noticed while looking at something else: pinned channels and pinned emoji
+are two independently-written implementations of the same data structure
+and behavior.
+
+### What's duplicated
+
+- Pinned channels: `pinned_channel_ids: VecDeque<Id<ChannelMarker>>` —
+  `src/tui/state/navigation.rs:70`. Toggle in
+  `src/tui/state/channels.rs:1017` (`toggle_channel_pin`): `push_front` on
+  pin, `remove` by position on unpin. Grouping/dedupe against the full item
+  list in `src/tui/state/popups/channel_switcher.rs:295-318`
+  (`pinned_channel_switcher_items`).
+- Pinned emoji: `pinned_emojis: VecDeque<ReactionEmoji>` —
+  `src/tui/state/emoji.rs:11`. Toggle around
+  `src/tui/state/popups/reactions.rs:432` with the same push_front/remove
+  shape. Grouping/dedupe around `reactions.rs:92`
+  (`pinned_emoji_reaction_items`) and the scoring sort at `reactions.rs:551`.
+
+Both persist through the same `UiStateOptions` round-trip pattern too
+(`src/tui/state/options.rs:156-158`, `:208-229`).
+
+### Fix shape
+
+A shared type — something like `PinnedSet<T: Eq + Hash + Clone>` wrapping
+the `VecDeque` + toggle (`push_front`/`remove`-by-position) + `contains` —
+used by both `navigation.channels` and `state.reactions`. The
+group/dedupe-against-a-catalog logic in `channel_switcher.rs` and
+`reactions.rs` is per-domain enough (different item types, different
+catalog shapes) that it probably stays separate, but the storage +
+toggle primitive doesn't need to exist twice.
+
+### Open questions, not decided yet
+
+- Whether to also unify the two `sort_by_key`-based grouping functions
+  behind a shared helper (e.g. "unread-first, then pin order") or leave
+  those separate given the item types differ (channel unread state vs.
+  emoji has no equivalent concept).
+- Whether this is worth doing before or after the next feature that would
+  add a *third* pinnable thing (none currently planned) — lower urgency
+  than the other two items above since nothing is broken today, it's a
+  maintainability cleanup.
