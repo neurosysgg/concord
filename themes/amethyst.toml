@@ -1,62 +1,90 @@
 # "Amethyst" — a purple/magenta example theme for Concord.
 #
 # One of two full-coverage examples in this repo: see `../theme.toml.example`
-# for every field at its built-in default with full explanatory comments;
-# this file shows the same field set customized into an actual palette, to
-# demonstrate what a from-scratch theme looks like in practice.
+# for every Highlight Group at its built-in default with full explanatory
+# comments; this file shows a from-scratch palette in practice.
+#
+# Rather than overriding every leaf group individually, this leans on the
+# built-in `link` inheritance: overriding a handful of base groups (Muted,
+# Border, FocusBorder, Selection, ActiveField, ...) cascades the palette to
+# every group that links to them (dim text, borders, focus highlights, etc.)
+# without repeating the same color a dozen times.
 #
 # Install: copy to your Concord config directory as `theme.toml` (same place
 # as `config.toml`/`keymap.toml`).
 
-[theme]
-
 # --- Core surfaces ---
 
-text = "#FFFFFF"
-accent = "#9000FF" # purple
-dim = "#808080"
-border = "#808080"
-background = "#2E0052" # darker purple from accent
-selection_bg = "#282D5A"
+[highlight.Normal]
+foreground = "#FFFFFF"
+
+[highlight.Muted]
+foreground = "#808080"
+
+[highlight.Border]
+foreground = "#808080"
+
+[highlight.FocusBorder]
+foreground = "#9000FF" # purple accent
+
+[highlight.ActiveField]
+foreground = "#9000FF"
+bold = true
+
+[highlight.Selection]
+foreground = "#9000FF"
+background = "#2E0052" # darker purple from the accent
 
 # --- Status colors ---
 
-success = "#00CA4E"
-warning = "#FFBD44"
-error = "#FF605C"
-info = "#2E0052"
+[highlight.Success]
+foreground = "#00CA4E"
 
-# --- Discord-brand and Discord-specific accents ---
+[highlight.Warning]
+foreground = "#FFBD44"
 
-blurple = "#5865F2"
-mention = "#A80ECF" # magenta
-unread_badge = "#FF605C" # not distinct from `error` here, on purpose
+[highlight.Error]
+foreground = "#FF605C"
 
-# --- Message text highlights ---
+[highlight.Info]
+foreground = "#2E0052"
 
-mention_self_bg = "#A80ECF"
-mention_other_bg = "#710C8A" # deeper magenta
-mention_other_fg = "#D4B6DC" # light tint of mention_other_bg, for contrast
-self_reaction = "#710C8A"
+# --- Mentions and reactions ---
 
-# --- Channel list / unread state ---
+[highlight.MentionSelf]
+foreground = "#FFFFFF"
+background = "#A80ECF" # magenta
 
-read_dim = "#828282"
-unread_bright = "#FFFFFF"
-scrollbar_thumb = "#AAAAAA"
+[highlight.MentionOther]
+foreground = "#D4B6DC" # light tint of MentionOther's background, for contrast
+background = "#710C8A" # deeper magenta
 
-# --- Panels and titles ---
+[highlight.MentionPickerRole]
+foreground = "#9B15BD"
 
-active = "#00CA4E"
-panel_title = "#FFFFFF"
-selected_forum_post_border = "#710C8A"
-selected_message_border = "#9B15BD" # magenta
+[highlight.MentionBadge]
+foreground = "#A80ECF"
+
+[highlight.NavigationMentioned]
+foreground = "#A80ECF"
+
+[highlight.SelfReaction]
+foreground = "#710C8A"
+
+# --- Unread state ---
+
+[highlight.UnreadDivider]
+foreground = "#FF605C" # not distinct from Error here, on purpose
+
+# --- Selected borders ---
+
+[highlight.ForumSelectedBorder]
+foreground = "#710C8A"
+
+[highlight.MessageSelectedBorder]
+foreground = "#9B15BD"
 
 # --- Presence ---
 
-presence_idle = "#FFBD44"
-
-# --- Fallback colors (used when Discord doesn't supply one) ---
-
-mention_role_fallback = "#9B15BD"
-dm_icon = "#9B15BD"
+[highlight.PresenceIdle]
+foreground = "#FFBD44"
